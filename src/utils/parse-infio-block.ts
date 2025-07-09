@@ -6,12 +6,14 @@ export type ParsedMsgBlock =
 	| {
 		type: 'string'
 		content: string
-	}
-	| {
+	} | {
 		type: 'think'
 		content: string
 	} | {
 		type: 'thinking'
+		content: string
+	} | {
+		type: 'communication'
 		content: string
 	} | {
 		type: 'write_to_file'
@@ -94,6 +96,26 @@ export type ParsedMsgBlock =
 		parameters: Record<string, unknown>,
 		finish: boolean
 	} | {
+		type: 'dataview_query'
+		query: string
+		outputFormat: string
+		finish: boolean
+	} | {
+		type: 'call_transformations'
+		path: string
+		transformation: string
+		finish: boolean
+	} | {
+		type: 'manage_files'
+		operations: Array<{
+			action: 'create_folder' | 'move' | 'delete' | 'copy' | 'rename'
+			path?: string
+			source_path?: string
+			destination_path?: string
+			new_name?: string
+		}>
+		finish: boolean
+	} | {
 		type: 'tool_result'
 		content: string
 	}
@@ -174,6 +196,39 @@ export function parseMsgBlocks(
 					})
 				}
 				lastEndOffset = endOffset
+			} else if (node.nodeName === 'communication') {
+				if (!node.sourceCodeLocation) {
+					throw new Error('sourceCodeLocation is undefined')
+				}
+				const startOffset = node.sourceCodeLocation.startOffset
+				const endOffset = node.sourceCodeLocation.endOffset
+				if (startOffset > lastEndOffset) {
+					parsedResult.push({
+						type: 'string',
+						content: input.slice(lastEndOffset, startOffset),
+					})
+				}
+
+				const children = node.childNodes
+				if (children.length === 0) {
+					parsedResult.push({
+						type: 'communication',
+						content: '',
+					})
+				} else {
+					const innerContentStartOffset =
+						children[0].sourceCodeLocation?.startOffset
+					const innerContentEndOffset =
+						children[children.length - 1].sourceCodeLocation?.endOffset
+					if (!innerContentStartOffset || !innerContentEndOffset) {
+						throw new Error('sourceCodeLocation is undefined')
+					}
+					parsedResult.push({
+						type: 'communication',
+						content: input.slice(innerContentStartOffset, innerContentEndOffset),
+					})
+				}
+				lastEndOffset = endOffset
 			} else if (node.nodeName === 'list_files') {
 				if (!node.sourceCodeLocation) {
 					throw new Error('sourceCodeLocation is undefined')
@@ -191,8 +246,10 @@ export function parseMsgBlocks(
 
 				for (const childNode of node.childNodes) {
 					if (childNode.nodeName === 'path' && childNode.childNodes.length > 0) {
+						// @ts-expect-error - parse5 node value type
 						path = childNode.childNodes[0].value
 					} else if (childNode.nodeName === 'recursive' && childNode.childNodes.length > 0) {
+						// @ts-expect-error - parse5 node value type
 						const recursiveValue = childNode.childNodes[0].value
 						recursive = recursiveValue ? recursiveValue.toLowerCase() === 'true' : false
 					}
@@ -220,6 +277,7 @@ export function parseMsgBlocks(
 				let path: string | undefined
 				for (const childNode of node.childNodes) {
 					if (childNode.nodeName === 'path' && childNode.childNodes.length > 0) {
+						// @ts-expect-error - parse5 node value type
 						path = childNode.childNodes[0].value
 					}
 				}
@@ -248,8 +306,10 @@ export function parseMsgBlocks(
 
 				for (const childNode of node.childNodes) {
 					if (childNode.nodeName === 'path' && childNode.childNodes.length > 0) {
+						// @ts-expect-error - parse5 node value type
 						path = childNode.childNodes[0].value
 					} else if (childNode.nodeName === 'query' && childNode.childNodes.length > 0) {
+						// @ts-expect-error - parse5 node value type
 						query = childNode.childNodes[0].value
 					}
 				}
@@ -278,8 +338,10 @@ export function parseMsgBlocks(
 
 				for (const childNode of node.childNodes) {
 					if (childNode.nodeName === 'path' && childNode.childNodes.length > 0) {
+						// @ts-expect-error - parse5 node value type
 						path = childNode.childNodes[0].value
 					} else if (childNode.nodeName === 'regex' && childNode.childNodes.length > 0) {
+						// @ts-expect-error - parse5 node value type
 						regex = childNode.childNodes[0].value
 					}
 				}
@@ -308,8 +370,10 @@ export function parseMsgBlocks(
 
 				for (const childNode of node.childNodes) {
 					if (childNode.nodeName === 'path' && childNode.childNodes.length > 0) {
+						// @ts-expect-error - parse5 node value type
 						path = childNode.childNodes[0].value
 					} else if (childNode.nodeName === 'query' && childNode.childNodes.length > 0) {
+						// @ts-expect-error - parse5 node value type
 						query = childNode.childNodes[0].value
 					}
 				}
@@ -339,13 +403,15 @@ export function parseMsgBlocks(
 				// 处理子标签
 				for (const childNode of node.childNodes) {
 					if (childNode.nodeName === 'path' && childNode.childNodes.length > 0) {
+						// @ts-expect-error - parse5 node value type
 						path = childNode.childNodes[0].value
 					} else if (childNode.nodeName === 'content' && childNode.childNodes.length > 0) {
 						// 如果内容有多个子节点，需要合并它们
-						content = childNode.childNodes.map(n => n.value || '').join('')
+						content = childNode.childNodes.map(n => (n as any).value || '').join('')
 					} else if (childNode.nodeName === 'line_count' && childNode.childNodes.length > 0) {
+						// @ts-expect-error - parse5 node value type
 						const lineCountStr = childNode.childNodes[0].value
-						lineCount = lineCountStr ? parseInt(lineCountStr) : undefined
+						lineCount = lineCountStr ? parseInt(lineCountStr as string) : undefined
 					}
 				}
 				parsedResult.push({
@@ -375,11 +441,13 @@ export function parseMsgBlocks(
 				// 处理子标签
 				for (const childNode of node.childNodes) {
 					if (childNode.nodeName === 'path' && childNode.childNodes.length > 0) {
+						// @ts-expect-error - parse5 node value type
 						path = childNode.childNodes[0].value
 					} else if (childNode.nodeName === 'operations' && childNode.childNodes.length > 0) {
 						try {
+							// @ts-expect-error - parse5 node value type
 							const operationsJson = childNode.childNodes[0].value
-							const operations = JSON5.parse(operationsJson)
+							const operations = JSON5.parse(operationsJson as string)
 							if (Array.isArray(operations) && operations.length > 0) {
 								const operation = operations[0]
 								startLine = operation.start_line || 1
@@ -417,12 +485,13 @@ export function parseMsgBlocks(
 				// 处理子标签
 				for (const childNode of node.childNodes) {
 					if (childNode.nodeName === 'path' && childNode.childNodes.length > 0) {
+						// @ts-expect-error - parse5 node value type
 						path = childNode.childNodes[0].value
 					} else if (childNode.nodeName === 'operations' && childNode.childNodes.length > 0) {
 						try {
-							// @ts-ignore
+							// @ts-expect-error - parse5 node value type
 							content = childNode.childNodes[0].value
-							operations = JSON5.parse(content)
+							operations = JSON5.parse(content as string)
 						} catch (error) {
 							console.error('Failed to parse operations JSON', error)
 						}
@@ -454,10 +523,10 @@ export function parseMsgBlocks(
 
 				for (const childNode of node.childNodes) {
 					if (childNode.nodeName === 'path' && childNode.childNodes.length > 0) {
-						// @ts-ignore
+						// @ts-expect-error - parse5 node value type
 						path = childNode.childNodes[0].value
 					} else if (childNode.nodeName === 'diff' && childNode.childNodes.length > 0) {
-						// @ts-ignore
+						// @ts-expect-error - parse5 node value type
 						diff = childNode.childNodes[0].value
 					}
 				}
@@ -484,7 +553,7 @@ export function parseMsgBlocks(
 				let result: string | undefined
 				for (const childNode of node.childNodes) {
 					if (childNode.nodeName === 'result' && childNode.childNodes.length > 0) {
-						// @ts-ignore
+						// @ts-expect-error - parse5 node value type
 						result = childNode.childNodes[0].value
 					}
 				}
@@ -509,7 +578,7 @@ export function parseMsgBlocks(
 				let question: string | undefined
 				for (const childNode of node.childNodes) {
 					if (childNode.nodeName === 'question' && childNode.childNodes.length > 0) {
-						// @ts-ignore
+						// @ts-expect-error - parse5 node value type
 						question = childNode.childNodes[0].value
 					}
 				}
@@ -537,10 +606,10 @@ export function parseMsgBlocks(
 
 				for (const childNode of node.childNodes) {
 					if (childNode.nodeName === 'mode_slug' && childNode.childNodes.length > 0) {
-						// @ts-ignore - 忽略 value 属性的类型错误
+						// @ts-expect-error - parse5 node value type
 						mode = childNode.childNodes[0].value
 					} else if (childNode.nodeName === 'reason' && childNode.childNodes.length > 0) {
-						// @ts-ignore - 忽略 value 属性的类型错误
+						// @ts-expect-error - parse5 node value type
 						reason = childNode.childNodes[0].value
 					}
 				}
@@ -567,7 +636,7 @@ export function parseMsgBlocks(
 				let query: string | undefined
 				for (const childNode of node.childNodes) {
 					if (childNode.nodeName === 'query' && childNode.childNodes.length > 0) {
-						// @ts-ignore
+						// @ts-expect-error - parse5 node value type
 						query = childNode.childNodes[0].value
 					}
 				}
@@ -595,9 +664,9 @@ export function parseMsgBlocks(
 				for (const childNode of node.childNodes) {
 					if (childNode.nodeName === 'urls' && childNode.childNodes.length > 0) {
 						try {
-							// @ts-ignore
+							// @ts-expect-error - parse5 node value type
 							const urlsJson = childNode.childNodes[0].value
-							const parsedUrls = JSON5.parse(urlsJson)
+							const parsedUrls = JSON5.parse(urlsJson as string)
 							if (Array.isArray(parsedUrls)) {
 								urls = parsedUrls
 							}
@@ -632,19 +701,19 @@ export function parseMsgBlocks(
 
 				for (const childNode of node.childNodes) {
 					if (childNode.nodeName === 'server_name' && childNode.childNodes.length > 0) {
-						// @ts-expect-error - 忽略 value 属性的类型错误
+						// @ts-expect-error - parse5 node value type
 						server_name = childNode.childNodes[0].value
 					} else if (childNode.nodeName === 'tool_name' && childNode.childNodes.length > 0) {
-						// @ts-expect-error - 忽略 value 属性的类型错误
+						// @ts-expect-error - parse5 node value type
 						tool_name = childNode.childNodes[0].value
 					} else if ((childNode.nodeName === 'parameters'
 						|| childNode.nodeName === 'input'
 						|| childNode.nodeName === 'arguments')
 						&& childNode.childNodes.length > 0) {
 						try {
-							// @ts-expect-error - 忽略 value 属性的类型错误
+							// @ts-expect-error - parse5 node value type
 							const parametersJson = childNode.childNodes[0].value
-							parameters = JSON5.parse(parametersJson)
+							parameters = JSON5.parse(parametersJson as string)
 						} catch (error) {
 							console.debug('Failed to parse parameters JSON', error)
 						}
@@ -657,7 +726,73 @@ export function parseMsgBlocks(
 					tool_name,
 					parameters,
 					finish: node.sourceCodeLocation.endTag !== undefined
-				})	
+				})
+				lastEndOffset = endOffset
+			} else if (node.nodeName === 'dataview_query') {
+				if (!node.sourceCodeLocation) {
+					throw new Error('sourceCodeLocation is undefined')
+				}
+				const startOffset = node.sourceCodeLocation.startOffset
+				const endOffset = node.sourceCodeLocation.endOffset
+				if (startOffset > lastEndOffset) {
+					parsedResult.push({
+						type: 'string',
+						content: input.slice(lastEndOffset, startOffset),
+					})
+				}
+
+				let query: string = ''
+				let outputFormat: string = 'table'
+
+				// 解析子节点
+				for (const childNode of node.childNodes) {
+					if (childNode.nodeName === 'query' && childNode.childNodes.length > 0) {
+						// @ts-expect-error - parse5 node value type
+						query = childNode.childNodes[0].value || ''
+					} else if (childNode.nodeName === 'output_format' && childNode.childNodes.length > 0) {
+						// @ts-expect-error - parse5 node value type
+						outputFormat = childNode.childNodes[0].value || 'table'
+					}
+				}
+
+				parsedResult.push({
+					type: 'dataview_query',
+					query,
+					outputFormat,
+					finish: node.sourceCodeLocation.endTag !== undefined
+				})
+				lastEndOffset = endOffset
+			} else if (node.nodeName === 'insights') {
+				if (!node.sourceCodeLocation) {
+					throw new Error('sourceCodeLocation is undefined')
+				}
+				const startOffset = node.sourceCodeLocation.startOffset
+				const endOffset = node.sourceCodeLocation.endOffset
+				if (startOffset > lastEndOffset) {
+					parsedResult.push({
+						type: 'string',
+						content: input.slice(lastEndOffset, startOffset),
+					})
+				}
+				let path: string | undefined
+				let transformation: string | undefined
+
+				for (const childNode of node.childNodes) {
+					if (childNode.nodeName === 'path' && childNode.childNodes.length > 0) {
+						// @ts-expect-error - parse5 node value type
+						path = childNode.childNodes[0].value
+					} else if (childNode.nodeName === 'transformation' && childNode.childNodes.length > 0) {
+						// @ts-expect-error - parse5 node value type
+						transformation = childNode.childNodes[0].value
+					}
+				}
+
+				parsedResult.push({
+					type: 'call_transformations',
+					path: path || '',
+					transformation: transformation || '',
+					finish: node.sourceCodeLocation.endTag !== undefined
+				})
 				lastEndOffset = endOffset
 			} else if (node.nodeName === 'tool_result') {
 				if (!node.sourceCodeLocation) {
@@ -691,6 +826,76 @@ export function parseMsgBlocks(
 						content: input.slice(innerContentStartOffset, innerContentEndOffset),
 					})
 				}
+				lastEndOffset = endOffset
+			} else if (node.nodeName === 'manage_files') {
+				if (!node.sourceCodeLocation) {
+					throw new Error('sourceCodeLocation is undefined')
+				}
+				const startOffset = node.sourceCodeLocation.startOffset
+				const endOffset = node.sourceCodeLocation.endOffset
+				if (startOffset > lastEndOffset) {
+					parsedResult.push({
+						type: 'string',
+						content: input.slice(lastEndOffset, startOffset),
+					})
+				}
+
+				let operations: Array<{
+					action: 'create_folder' | 'move' | 'delete' | 'copy' | 'rename'
+					path?: string
+					source_path?: string
+					destination_path?: string
+					new_name?: string
+				}> = []
+
+				// 检查是否有 operations 子标签
+				for (const childNode of node.childNodes) {
+					if (childNode.nodeName === 'operations' && childNode.childNodes.length > 0) {
+						try {
+							// 获取 operations 标签内的内容
+							const operationsChildren = childNode.childNodes
+							if (operationsChildren.length > 0) {
+								const innerContentStartOffset = operationsChildren[0].sourceCodeLocation?.startOffset
+								const innerContentEndOffset = operationsChildren[operationsChildren.length - 1].sourceCodeLocation?.endOffset
+								
+								if (innerContentStartOffset && innerContentEndOffset) {
+									const jsonContent = input.slice(innerContentStartOffset, innerContentEndOffset).trim()
+									operations = JSON5.parse(jsonContent)
+								}
+							}
+						} catch (error) {
+							console.error('Failed to parse operations JSON', error)
+						}
+						break
+					}
+				}
+
+				// 如果没有找到 operations 子标签，尝试直接解析标签内容
+				if (operations.length === 0) {
+					const children = node.childNodes
+					if (children.length > 0) {
+						try {
+							const innerContentStartOffset = children[0].sourceCodeLocation?.startOffset
+							const innerContentEndOffset = children[children.length - 1].sourceCodeLocation?.endOffset
+							
+							if (innerContentStartOffset && innerContentEndOffset) {
+								const jsonContent = input.slice(innerContentStartOffset, innerContentEndOffset).trim()
+								// 检查内容是否以 [ 开头（纯 JSON 数组）
+								if (jsonContent.startsWith('[')) {
+									operations = JSON5.parse(jsonContent)
+								}
+							}
+						} catch (error) {
+							console.error('Failed to parse manage_files JSON', error)
+						}
+					}
+				}
+				
+				parsedResult.push({
+					type: 'manage_files',
+					operations,
+					finish: node.sourceCodeLocation.endTag !== undefined
+				})
 				lastEndOffset = endOffset
 			}
 		}

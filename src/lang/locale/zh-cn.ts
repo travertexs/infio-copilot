@@ -7,6 +7,12 @@ export default {
 			subtitle: "探索不同模式来提升您的生产力"
 		},
 		navigation: {
+			history: "聊天记录",
+			historyDesc: "查看和管理您的对话历史记录",
+			insights: "AI 洞察",
+			insightsDesc: "查看 AI 生成的洞察和分析",
+			search: "语义搜索",
+			searchDesc: "使用 RAG 在笔记库中进行语义搜索",
 			commands: "命令",
 			commandsDesc: "创建和管理用于快速操作的自定义命令",
 			customMode: "自定义模式",
@@ -48,7 +54,29 @@ export default {
 			save: "保存",
 			cancel: "取消",
 			yesterday: "昨天",
-			daysAgo: "天前"
+			daysAgo: "天前",
+			// New keys for ChatHistoryView
+			cleanup: "清理",
+			cleanupTitle: "清理历史版本",
+			cleanupConfirm: "此操作将永久删除所有对话的历史版本，只保留最新版。这有助于清理数据，但操作不可撤销。确定要继续吗？",
+			cleanupSuccess: "成功清理了 {count} 个过时的对话文件。",
+			cleanupNone: "没有需要清理的对话文件。",
+			cleanupFailed: "清理失败，请检查开发者控制台获取更多信息。",
+			multiSelect: "多选",
+			exitSelection: "退出选择模式",
+			enterSelection: "进入选择模式",
+			selectionMode: "选择模式 - 已选择 {count} 个对话",
+			selectAll: "全选",
+			unselectAll: "取消全选",
+			batchDelete: "批量删除",
+			batchDeleteConfirm: "确定要删除选中的 {count} 个对话吗？此操作不可撤销。",
+			batchDeleteSuccess: "成功删除 {count} 个对话",
+			batchDeleteFailed: "{count} 个对话删除失败",
+			selectFirst: "请先选择要删除的对话",
+			currentWorkspace: "当前工作区",
+			showAllChats: "显示所有对话",
+			showWorkspaceChats: "只显示当前工作区对话",
+			workspaceLabel: "工作区: {workspace}"
 		},
 		shortcutInfo: {
 			editInline: "行内编辑",
@@ -103,6 +131,7 @@ export default {
 			applying: "正在应用...",
 			apply: "应用",
 			reasoning: "推理",
+			plan: "规划",
 			readFile: "读取文件：{path}",
 			listFiles: "列出文件：{path}",
 			fetchUrlsContent: "获取 URL 内容",
@@ -240,6 +269,8 @@ export default {
 			autocompleteModelDescription: '用于代码和文本自动补全的模型，提供智能写作建议',
 			embeddingModel: '嵌入模型：',
 			embeddingModelDescription: '用于文档向量化和语义搜索的模型，支持 RAG 功能',
+			insightModel: '洞察模型：',
+			insightModelDescription: '用于生成智能洞察和分析的模型，提供深度内容理解',
 		},
 		
 		// 模型提供商设置
@@ -250,6 +281,7 @@ export default {
 			oneClickConfig: '一键配置',
 			oneClickConfigTooltip: '自动配置模型为已设置 API Key 的提供商的推荐模型',
 			chatModelConfigured: '已自动配置聊天模型：{provider}/{model}',
+			insightModelConfigured: '已自动配置洞察模型：{provider}/{model}',
 			autocompleteModelConfigured: '已自动配置自动补全模型：{provider}/{model}',
 			embeddingModelConfigured: '已自动配置嵌入模型：{provider}/{model}',
 			provider: '提供商',
@@ -258,6 +290,11 @@ export default {
 			searchOrEnterModelName: '搜索或输入模型名称...',
 			enterCustomModelName: '输入自定义模型名称',
 			custom: '自定义: ',
+			localProviderDescription: '本地嵌入模型使用 WASM 技术在您的设备上运行，提供隐私保护和离线功能。',
+			localProviderFeature0: '目前仅支持嵌入模型',
+			localProviderFeature1: '完全隐私 - 数据不会离开您的设备',
+			localProviderFeature2: '无 API 费用 - 完全本地运行',
+			localProviderFeature3: '离线功能 - 无需网络连接即可工作',
 			testConnection: {
 				testApiConnection: '测试 API 连接',
 				testingConnection: '正在测试连接...',
@@ -365,6 +402,10 @@ export default {
 		// RAG 部分
 		RAG: {
 			title: 'RAG(高级)',
+			filesystem: '文件系统',
+			filesystemDescription: '选择存储向量嵌入的文件系统后端。IDB 使用 IndexedDB（更好的兼容性），OPFS 使用 Origin Private File System（更好的性能）。',
+			idb: 'IndexedDB',
+			opfs: 'OPFS',
 			includePatterns: '包含模式',
 			includePatternsDescription: '如果指定了任何模式，则只有匹配至少一个模式的文件才会被包含在索引中。每行一个模式。使用 glob 模式（例如，"notes/*", "*.md"）。留空以包含所有未被排除模式排除的文件。更改后，请使用命令 "重建整个 Vault 索引" 来应用更改。',
 			testPatterns: '测试模式',
@@ -372,6 +413,8 @@ export default {
 			excludePatternsDescription: '匹配任何这些模式的文件将从索引中排除。每行一个模式。使用 glob 模式（例如，"private/*", "*.tmp"）。留空以不排除任何内容。更改后，请使用命令 "重建整个 Vault 索引" 来应用更改。',
 			chunkSize: '分块大小',
 			chunkSizeDescription: '设置文本分割的分块大小。更改后，请使用 "重建整个 Vault 索引" 命令重新索引 Vault。',
+			batchSize: '批处理大小',
+			batchSizeDescription: '设置嵌入的批处理大小。较小的值可以减少内存使用。更改后，请使用 "重建整个 Vault 索引" 命令重新索引 Vault。',
 			thresholdTokens: '阈值 Tokens',
 			thresholdTokensDescription: '切换到 RAG 之前的最大 Tokens 数。如果提及文件的总 Tokens 超过此值，将使用 RAG 而不是包含所有文件内容。',
 			minSimilarity: '最小相似度',
@@ -504,6 +547,213 @@ export default {
 			parameters: "参数",
 			toolNoDescription: "无描述",
 			useMcpToolFrom: "使用来自以下的 MCP 工具：",
+		}
+	},
+	semanticSearch: {
+		title: "语义索引",
+		embeddingModel: "嵌入模型:",
+		vectorBlocks: "个向量块",
+		files: "文件",
+		initializeIndex: "初始化索引",
+		updateIndex: "更新索引",
+		initializing: "正在初始化...",
+		initializingWorkspace: "正在初始化工作区 RAG 向量索引",
+		initializingDescription: "为当前工作区的文件建立向量索引，提高搜索精度",
+		buildingVectorIndex: "建立向量索引",
+		blocks: "块",
+		totalFiles: "共 {count} 个文件",
+		initializationComplete: "工作区 RAG 向量索引初始化完成: {workspaceName}",
+		searchPlaceholder: "语义搜索（按回车键搜索）...",
+		searching: "正在搜索...",
+		noResults: "未找到相关结果",
+		imagePlaceholder: "[图片]",
+		// 搜索模式
+		searchMode: {
+			all: "全部",
+			allDescription: "聚合搜索原始笔记和 AI 洞察",
+			notes: "原始笔记",
+			notesDescription: "搜索原始笔记内容",
+			insights: "AI 洞察",
+			insightsDescription: "搜索 AI 洞察内容"
+		},
+		// 统计信息
+		stats: {
+			filesAndBlocks: "{files} 个文件，{blocks} 个块",
+			filesAndInsights: "{files} 个文件，{insights} 个洞察",
+			filesBlocksAndInsights: "{files} 个文件，{blocks} 个块，{insights} 个洞察"
+		},
+		// 确认对话框
+		deleteConfirm: {
+			title: "清除工作区索引",
+			message: "将清除当前工作区的所有向量索引数据。",
+			warning: "此操作无法撤销，清除后需要重新初始化索引才能进行语义搜索。",
+			workspaceLabel: "工作区:",
+			entireVault: "整个 Vault",
+			cancel: "取消",
+			confirm: "确认清除"
+		},
+		initConfirm: {
+			initTitle: "初始化工作区索引",
+			updateTitle: "更新工作区索引",
+			initMessage: "将为当前工作区的所有文件建立向量索引，这将提高语义搜索的准确性。",
+			updateMessage: "将更新当前工作区的向量索引，重新处理所有文件以确保索引最新。",
+			embeddingModelLabel: "嵌入模型:",
+			workspaceLabel: "工作区:",
+			entireVault: "整个 Vault",
+			warning: "此操作可能需要几分钟时间，具体取决于文件数量和大小。",
+			cancel: "取消",
+			startInit: "开始初始化",
+			startUpdate: "开始更新"
+		}
+	},
+	insights: {
+		title: "AI 洞察",
+		initializeInsights: "初始化洞察",
+		updateInsights: "更新洞察",
+		clearInsights: "清除洞察",
+		refresh: "刷新",
+		initializing: "初始化中...",
+		deleting: "删除中...",
+		loading: "加载中...",
+		initializingWorkspace: "正在初始化工作区洞察...",
+		initializingDescription: "这可能需要几分钟时间，请耐心等待",
+		stage: {
+			preparing: "准备初始化工作区洞察",
+			completing: "正在完成初始化",
+			savingResults: "保存结果"
+		},
+		deleteConfirm: {
+			title: "确认删除",
+			message: "您确定要删除当前工作区的所有洞察吗？",
+			warning: "⚠️ 这个操作不可撤销，将删除所有生成的转换和洞察数据。",
+			scopeLabel: "影响范围:",
+			cancel: "取消",
+			confirm: "确认删除"
+		},
+		initConfirm: {
+			initTitle: "确认初始化洞察",
+			updateTitle: "确认更新洞察",
+			initMessage: "您确定要初始化当前工作区的洞察吗？这将生成 AI 摘要和分析。",
+			updateMessage: "您确定要更新当前工作区的洞察吗？这将为修改或新增的文件生成 AI 摘要和分析。",
+			modelLabel: "使用模型:",
+			workspaceLabel: "目标工作区:",
+			defaultModel: "默认模型",
+			initWarning: "⚠️ 这个过程可能需要较长时间，并会产生 API 费用。",
+			updateWarning: "⚠️ 这个过程可能需要一些时间，并会产生 API 费用。只会处理修改或新增的文件。",
+			cancel: "取消",
+			initConfirm: "确认初始化",
+			updateConfirm: "确认更新"
+		},
+		stats: {
+			itemsAndInsights: "{items} 个项目，{insights} 个洞察",
+			workspace: "{count}工作区",
+			folder: "{count}文件夹",
+			file: "{count}文件",
+			scopeLabel: "范围:",
+			insightCount: "个洞察",
+			workspaceCount: "个工作区",
+			folderCount: "个文件夹",
+			fileCount: "个文件",
+			insightModelLabel: "洞察模型:"
+		},
+		types: {
+			denseSummary: "📋 密集摘要",
+			simpleSummary: "📄 简单摘要",
+			keyInsights: "💡 关键洞察",
+			analyzePaper: "🔬 论文分析",
+			tableOfContents: "📑 目录大纲",
+			reflections: "🤔 思考反思"
+		},
+		fileGroup: {
+			workspacePrefix: "🌐 工作区:",
+			folderPrefix: "📁"
+		},
+		noResults: {
+			title: "当前范围内没有找到洞察数据",
+			hint: "请尝试在文档上运行转换工具来生成 AI 洞察"
+		},
+		tooltips: {
+			initialize: "初始化当前工作区的洞察，会递归处理所有文件并生成摘要",
+			update: "更新当前工作区的洞察，为修改或新增的文件生成摘要",
+			clear: "删除当前工作区的所有转换和洞察"
+		},
+		success: {
+			workspaceInitialized: '工作区 "{name}" 洞察初始化成功',
+			workspaceDeleted: '工作区 "{name}" 的 {count} 个转换已成功删除',
+			insightDeleted: '洞察 ID {id} 已成功删除'
+		},
+		error: {
+			initializationFailed: "工作区洞察初始化失败:",
+			deletionFailed: "删除工作区洞察失败:",
+			singleDeletionFailed: "删除洞察失败:",
+			fileNotFound: "在vault中找不到文件:",
+			folderNotFound: "文件夹不存在:"
+		},
+		progress: {
+			current: "正在处理: {item}",
+			stage: "阶段:",
+			progressLabel: "进度:",
+			currentLabel: "当前:",
+			insightCountLabel: "个洞察"
+		}
+	},
+	workspace: {
+		title: "工作区管理",
+		shortTitle: "工作区",
+		description: "管理和切换不同的工作区（笔记库）",
+		entireVault: "整个 Vault",
+		createNew: "创建新工作区",
+		recentWorkspaces: "最近的工作区",
+		loading: "正在加载工作区列表...",
+		noWorkspaces: "暂无工作区",
+		empty: "空工作区",
+		editTooltip: "编辑工作区",
+		deleteTooltip: "删除工作区",
+		refreshTooltip: "刷新工作区列表",
+		newWorkspace: "新建工作区",
+		notices: {
+			alreadyInWorkspace: "当前已在此工作区中",
+			switchedTo: "切换到工作区: {name}",
+			workspaceContent: "工作区内容: {content}",
+			cannotDeleteCurrent: "无法删除当前工作区",
+			cannotDeleteDefault: "无法删除默认工作区",
+			deleted: "已删除工作区: {name}",
+			deleteFailed: "删除工作区失败",
+			created: "已创建工作区: {name}",
+			createFailed: "创建工作区失败",
+			updated: "已更新工作区: {name}",
+			updateFailed: "更新工作区失败",
+			refreshFailed: "刷新工作区列表失败",
+			switchFailed: "切换工作区失败"
+		},
+		deleteConfirm: '确定要删除工作区 "{name}" 吗？此操作不可撤销。',
+		current: "当前",
+		conversations: "个对话",
+		created: "创建",
+		updated: "更新",
+		folders: "个文件夹",
+		tags: "个标签",
+		noContent: "无内容",
+		editModal: {
+			editTitle: "编辑工作区",
+			createTitle: "创建工作区",
+			nameLabel: "工作区名称",
+			namePlaceholder: "请输入工作区名称",
+			newNamePlaceholder: "请输入新工作区名称",
+			contentLabel: "工作区内容",
+			noContent: "暂无内容，请添加文件夹或标签",
+			addPlaceholder: "添加文件夹或标签...",
+			folder: "文件夹",
+			tag: "标签",
+			tip: "提示：输入关键词搜索现有文件夹和标签，以 # 开头的会被识别为标签",
+			cancel: "取消",
+			save: "保存",
+			create: "创建",
+			saving: "保存中...",
+			creating: "创建中...",
+			nameRequired: "工作区名称不能为空",
+			saveFailed: "保存失败，请重试",
+			defaultName: "工作区 {date}"
 		}
 	}
 };

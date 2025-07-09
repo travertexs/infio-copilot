@@ -1,4 +1,4 @@
-import { App, MarkdownView, TAbstractFile, TFile, TFolder, Vault, getLanguage, htmlToMarkdown, normalizePath, requestUrl } from 'obsidian'
+import { App, TAbstractFile, TFile, TFolder, Vault, getLanguage, htmlToMarkdown, normalizePath, requestUrl } from 'obsidian'
 
 import { editorStateToPlainText } from '../components/chat-view/chat-input/utils/editor-state-to-plain-text'
 import { QueryProgressState } from '../components/chat-view/QueryProgress'
@@ -8,6 +8,7 @@ import { SystemPrompt } from '../core/prompts/system'
 import { RAGEngine } from '../core/rag/rag-engine'
 import { ConvertDataManager } from '../database/json/convert-data/ConvertDataManager'
 import { ConvertType } from '../database/json/convert-data/types'
+import { WorkspaceManager } from '../database/json/workspace/WorkspaceManager'
 import { SelectVector } from '../database/schema'
 import { ChatMessage, ChatUserMessage } from '../types/chat'
 import { ContentPart, RequestMessage } from '../types/llm/request'
@@ -134,6 +135,13 @@ async function getFileOrFolderContent(
 	}
 }
 
+function formatSection(title: string, content: string | null | undefined): string {
+	if (!content || content.trim() === '') {
+		return ''
+	}
+	return `\n\n# ${title}\n${content.trim()}`
+}
+
 export class PromptGenerator {
 	private getRagEngine: () => Promise<RAGEngine>
 	private app: App
@@ -144,6 +152,7 @@ export class PromptGenerator {
 	private customModeList: ModeConfig[] | null = null
 	private getMcpHub: () => Promise<McpHub> | null = null
 	private convertDataManager: ConvertDataManager
+	private workspaceManager: WorkspaceManager
 	private static readonly EMPTY_ASSISTANT_MESSAGE: RequestMessage = {
 		role: 'assistant',
 		content: '',
@@ -167,6 +176,7 @@ export class PromptGenerator {
 		this.customModeList = customModeList ?? null
 		this.getMcpHub = getMcpHub ?? null
 		this.convertDataManager = new ConvertDataManager(app)
+		this.workspaceManager = new WorkspaceManager(app)
 	}
 
 	public async generateRequestMessages({
@@ -243,70 +253,204 @@ export class PromptGenerator {
 		}
 	}
 
-	private async getEnvironmentDetails() {
-		let details = ""
-		// Obsidian Current File
-		details += "\n\n# Obsidian Current File"
-		const currentFile = this.app.workspace.getActiveFile()
-		if (currentFile) {
-			details += `\n${currentFile?.path}`
-		} else {
-			details += "\n(No current file)"
+	private async getEnvironmentDetails(): Promise<string> {
+		const currentFile = await this.getCurrentFile()
+		const workspaceOverview = await this.getWorkspaceOverview()
+		const assistantState = await this.getAssistantState()
+
+		const details = [
+			currentFile,
+			workspaceOverview,
+			assistantState,
+		]
+			.filter(Boolean)
+			.join('')
+
+		if (!details.trim()) {
+			return ''
 		}
-
-		// Obsidian Open Tabs
-		details += "\n\n# Obsidian Open Tabs"
-		const openTabs: string[] = [];
-		this.app.workspace.iterateAllLeaves(leaf => {
-			if (leaf.view instanceof MarkdownView && leaf.view.file) {
-				openTabs.push(leaf.view.file?.path);
-			}
-		});
-		if (openTabs.length === 0) {
-			details += "\n(No open tabs)"
-		} else {
-			details += `\n${openTabs.join("\n")}`
-		}
-
-		// Add current time information with timezone
-		const now = new Date()
-		const formatter = new Intl.DateTimeFormat(undefined, {
-			year: "numeric",
-			month: "numeric",
-			day: "numeric",
-			hour: "numeric",
-			minute: "numeric",
-			second: "numeric",
-			hour12: true,
-		})
-		const timeZone = formatter.resolvedOptions().timeZone
-		const timeZoneOffset = -now.getTimezoneOffset() / 60 // Convert to hours and invert sign to match conventional notation
-		const timeZoneOffsetStr = `${timeZoneOffset >= 0 ? "+" : ""}${timeZoneOffset}:00`
-		details += `\n\n# Current Time\n${formatter.format(now)} (${timeZone}, UTC${timeZoneOffsetStr})`
-
-		// Add current mode details
-		const currentMode = this.settings.mode
-		const modeDetails = await getFullModeDetails(this.app, currentMode, this.customModeList, this.customModePrompts)
-		details += `\n\n# Current Mode\n`
-		details += `<slug>${currentMode}</slug>\n`
-		details += `<name>${modeDetails.name}</name>\n`
-
-		// // Obsidian Current Folder
-		// const currentFolder = this.app.workspace.getActiveFile() ? this.app.workspace.getActiveFile()?.parent?.path : "/"
-		// // Obsidian Vault Files and Folders
-		// if (currentFolder) {
-		// 	details += `\n\n# Obsidian Current Folder (${currentFolder}) Files`
-		// 	const filesAndFolders = await listFilesAndFolders(this.app.vault, currentFolder)
-		// 	if (filesAndFolders.length > 0) {
-		// 		details += `\n${filesAndFolders.filter(Boolean).join("\n")}`
-		// 	} else {
-		// 		details += "\n(No Markdown files in current folder)"
-		// 	}
-		// } else {
-		// 	details += "\n(No current folder)"
-		// }
 
 		return `<environment_details>\n${details.trim()}\n</environment_details>`
+	}
+
+	private async getCurrentFile(): Promise<string | null> {
+		const currentNote = this.app.workspace.getActiveFile()
+		if (!currentNote) {
+			return formatSection("Current File", "(No current file active)")
+		}
+		return formatSection("Current File", currentNote.path)
+	}
+
+	private async getFileMetadataContext(file: TFile): Promise<string> {
+		const fileCache = this.app.metadataCache.getFileCache(file)
+		if (!fileCache) {
+			return `None Found`
+		}
+
+		let context = ``
+
+		if (fileCache.frontmatter) {
+			const frontmatterString = Object.entries(fileCache.frontmatter)
+				.filter(([key]) => key !== 'position')
+				.map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
+				.join('\n')
+			if (frontmatterString) {
+				context += `\n\n## Metadata (Frontmatter)\n${frontmatterString}`
+			}
+		}
+
+		if (fileCache.headings && fileCache.headings.length > 0) {
+			const outline = fileCache.headings
+				.map(h => `${'  '.repeat(h.level - 1)}- ${h.heading}`)
+				.join('\n')
+			context += `\n\n## Outline\n${outline}`
+		}
+
+		return context
+	}
+
+	private async getFileOrFolderMetadata(path: TAbstractFile): Promise<string> {
+		if (path instanceof TFile) {
+			// 对于所有文件类型，都尝试获取元信息
+			const fileCache = this.app.metadataCache.getFileCache(path)
+			if (!fileCache) {
+				// 如果没有缓存的元信息，只返回文件路径
+				return `Note Path: ${path.path}`
+			}
+
+			let context = `Note Path: ${path.path}`
+
+			if (fileCache.frontmatter) {
+				const frontmatterString = Object.entries(fileCache.frontmatter)
+					.filter(([key]) => key !== 'position')
+					.map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
+					.join('\n')
+				if (frontmatterString) {
+					context += `\n\n## Metadata (Frontmatter)\n${frontmatterString}`
+				}
+			}
+
+			if (fileCache.headings && fileCache.headings.length > 0) {
+				const outline = fileCache.headings
+					.map(h => `${'  '.repeat(h.level - 1)}- ${h.heading}`)
+					.join('\n')
+				context += `\n\n## Outline\n${outline}`
+			}
+
+			return context
+		} else if (path instanceof TFolder) {
+			const entries = path.children
+			let folderContent = ""
+
+			// 首先，构建文件夹的树状结构
+			entries.forEach((entry, index) => {
+				const isLast = index === entries.length - 1
+				const linePrefix = isLast ? "└── " : "├── "
+				if (entry instanceof TFile) {
+					folderContent += `${linePrefix}${entry.name}\n`
+				} else if (entry instanceof TFolder) {
+					folderContent += `${linePrefix}${entry.name}/\n`
+				} else {
+					folderContent += `${linePrefix}${entry.name}\n`
+				}
+			})
+
+			// 然后，为文件夹内的所有文件附加元数据（不仅仅是Markdown文件）
+			const fileMetadataPromises = entries
+				.filter((entry): entry is TFile => entry instanceof TFile)
+				.map(async (file) => {
+					const metadata = await this.getFileMetadataContext(file)
+					return `<file_metadata path="${file.path}">\n${metadata}\n</file_metadata>`
+				})
+
+			const fileMetadataContents = (await Promise.all(fileMetadataPromises)).join("\n\n")
+
+			return `${folderContent}\n${fileMetadataContents}`.trim()
+		} else {
+			return `(Failed to read metadata of ${path.path})`
+		}
+	}
+
+	// private async getNoteConnectivity(): Promise<string | null> {
+	// 	const currentFile = this.app.workspace.getActiveFile()
+	// 	if (!currentFile) {
+	// 		return null
+	// 	}
+
+	// 	const fileCache = this.app.metadataCache.getFileCache(currentFile)
+	// 	if (!fileCache) {
+	// 		return null
+	// 	}
+
+	// 	let connectivity = ""
+
+	// 	if (fileCache.links && fileCache.links.length > 0) {
+	// 		const outgoingLinks = fileCache.links.map(l => `- [[${l.link}]]`).join('\n')
+	// 		connectivity += `\n## Outgoing Links\n${outgoingLinks}`
+	// 	}
+
+	// 	const backlinks: string[] = []
+	// 	const resolvedLinks = this.app.metadataCache.resolvedLinks
+	// 	if (resolvedLinks) {
+	// 		for (const sourcePath in resolvedLinks) {
+	// 			if (currentFile.path in resolvedLinks[sourcePath]) {
+	// 				backlinks.push(`- [[${sourcePath}]]`)
+	// 			}
+	// 		}
+	// 	}
+
+	// 	if (backlinks.length > 0) {
+	// 		connectivity += `\n\n## Backlinks\n${backlinks.join('\n')}`
+	// 	}
+
+	// 	return formatSection("Note Connectivity", connectivity.trim())
+	// }
+
+	private async getWorkspaceOverview(): Promise<string> {
+		let overview = ''
+
+		const currentWorkspaceName = this.settings.workspace
+		if (currentWorkspaceName && currentWorkspaceName !== 'vault') {
+			const workspace = await this.workspaceManager.findByName(currentWorkspaceName)
+			if (workspace) {
+				// 使用 listFilesAndFolders 获取详细的工作区结构
+				const { listFilesAndFolders } = await import('./glob-utils')
+				const workspaceStructure = await listFilesAndFolders(
+					this.app.vault,
+					undefined,
+					false, // 非递归，只显示第一层
+					workspace,
+					this.app
+				)
+				overview += `\n\n# Current Workspace\n${workspaceStructure.join('\n')}`
+			}
+		} else {
+			overview += `\n\n# Current Workspace\n${this.app.vault.getName()} (entire vault)`
+		}
+
+		return overview
+	}
+
+	private async getAssistantState(): Promise<string> {
+		let state = ''
+
+		const now = new Date()
+		const formatter = new Intl.DateTimeFormat(undefined, {
+			year: "numeric", month: "numeric", day: "numeric",
+			hour: "numeric", minute: "numeric", second: "numeric", hour12: true,
+		})
+		const timeZone = formatter.resolvedOptions().timeZone
+		const timeZoneOffset = -now.getTimezoneOffset() / 60
+		const timeZoneOffsetStr = `${timeZoneOffset >= 0 ? "+" : ""}${timeZoneOffset}:00`
+		const timeDetails = `${formatter.format(now)} (${timeZone}, UTC${timeZoneOffsetStr})`
+		state += `\n## Current Time\n${timeDetails}`
+
+		const currentMode = this.settings.mode
+		const modeDetails = await getFullModeDetails(this.app, currentMode, this.customModeList, this.customModePrompts)
+		const modeInfo = `<slug>${currentMode}</slug>\n<name>${modeDetails.name}</name>`
+		state += `\n\n## Current Mode\n${modeInfo}`
+
+		return formatSection('Assistant & User State', state.trim())
 	}
 
 	private async compileUserMessagePrompt({
@@ -329,10 +473,7 @@ export class PromptGenerator {
 		fileReadResults?: Array<{ path: string, content: string }>
 		websiteReadResults?: Array<{ url: string, content: string }>
 	}> {
-		// Add environment details
-		// const environmentDetails = isNewChat
-		// 	? await this.getEnvironmentDetails()
-		// 	: undefined
+
 		const environmentDetails = await this.getEnvironmentDetails()
 
 		// if isToolCallReturn, add read_file_content to promptContent
@@ -398,23 +539,18 @@ export class PromptGenerator {
 				let markdownFilePath = ''
 				if (file.extension !== 'md' && mcpHub?.isBuiltInServerAvailable()) {
 					[content, markdownFilePath] = await this.callMcpToolConvertDocument(file, mcpHub)
-				} else {
-					content = await getFileOrFolderContent(
-						file,
-						this.app.vault,
-						this.app
+					// 创建Markdown文件
+					markdownFilePath = markdownFilePath || await this.createMarkdownFileForContent(
+						file.path,
+						content,
+						false
 					)
+				} else {
+					content = await this.getFileOrFolderMetadata(file)
 				}
 
-				// 创建Markdown文件
-				markdownFilePath = markdownFilePath || await this.createMarkdownFileForContent(
-					file.path,
-					content,
-					false
-				)
-
 				completedFiles++
-				fileContents.push(`<file_content path="${file.path}">\n${content}\n</file_content>`)
+				fileContents.push(`<user_mention_file path="${file.path}">\n${content}\n</user_mention_file>`)
 				fileContentsForProgress.push({ path: markdownFilePath, content })
 				allFileReadResults.push({ path: markdownFilePath, content })
 			}
@@ -459,21 +595,10 @@ export class PromptGenerator {
 					completedFiles: completedFolders
 				})
 
-				const content = await getFileOrFolderContent(
-					folder,
-					this.app.vault,
-					this.app
-				)
-
-				// // 为文件夹内容创建Markdown文件
-				// const markdownFilePath = await this.createMarkdownFileForContent(
-				// 	`${folder.path}/folder-contents`,
-				// 	content,
-				// 	false
-				// )
+				const content = await this.getFileOrFolderMetadata(folder)
 
 				completedFolders++
-				folderContents.push(`<folder_content path="${folder.path}">\n${content}\n</folder_content>`)
+				folderContents.push(`<user_mention_folder path="${folder.path}">\n${content}\n</user_mention_folder>`)
 				folderContentsForProgress.push({ path: folder.path, content })
 				allFileReadResults.push({ path: folder.path, content })
 			}
@@ -500,7 +625,7 @@ export class PromptGenerator {
 			? blocks
 				.map(({ file, content, startLine, endLine }) => {
 					const content_with_line_numbers = addLineNumbers(content, startLine)
-					return `<file_block_content location="${file.path}#L${startLine}-${endLine}">\n${content_with_line_numbers}\n</file_block_content>`
+					return `<user_mention_blocks location="${file.path}#L${startLine}-${endLine}">\n${content_with_line_numbers}\n</user_mention_blocks>`
 				})
 				.join('\n')
 			: undefined
@@ -562,7 +687,7 @@ export class PromptGenerator {
 		const urlContentsPrompt = urlContents.length > 0
 			? urlContents
 				.map(({ url, content }) => (
-					`<file_content path="${url}">\n${content}\n</file_content>`
+					`<user_mention_url path="${url}">\n${content}\n</user_mention_url>`
 				))
 				.join('\n') : undefined
 
@@ -589,20 +714,15 @@ export class PromptGenerator {
 				const [mcpCurrFileContent, mcpCurrFileContentPath] = await this.callMcpToolConvertDocument(currentFile.file, mcpHub)
 				currentFileContent = mcpCurrFileContent
 				currentMarkdownFilePath = mcpCurrFileContentPath
-			} else {
-				currentFileContent = await getFileOrFolderContent(
-					currentFile.file,
-					this.app.vault,
-					this.app
+				// 为当前文件创建Markdown文件
+				currentMarkdownFilePath = currentMarkdownFilePath || await this.createMarkdownFileForContent(
+					currentFile.file.path,
+					currentFileContent,
+					false
 				)
+			} else {
+				currentFileContent = await this.getFileOrFolderMetadata(currentFile.file)
 			}
-
-			// 为当前文件创建Markdown文件
-			currentMarkdownFilePath = currentMarkdownFilePath || await this.createMarkdownFileForContent(
-				currentFile.file.path,
-				currentFileContent,
-				false
-			)
 
 			// 添加当前文件到读取结果中
 			allFileReadResults.push({ path: currentMarkdownFilePath, content: currentFileContent })
@@ -627,7 +747,7 @@ export class PromptGenerator {
 				shouldIncludeCurrentFile = true
 			} else {
 				// For continuing chats, check if current file content already exists in history
-				const currentFilePromptTag = `<current_file_content path="${currentFile.file.path}">`
+				const currentFilePromptTag = `<current_tab_note path="${currentFile.file.path}">`
 				const hasCurrentFileInHistory = messages?.some((msg) => {
 					if (msg.role === 'user' && msg.promptContent) {
 						if (typeof msg.promptContent === 'string') {
@@ -651,7 +771,7 @@ export class PromptGenerator {
 		}
 
 		const currentFileContentPrompt = shouldIncludeCurrentFile
-			? `<current_file_content path="${currentFile.file.path}">\n${currentFileContent}\n</current_file_content>`
+			? `<current_tab_note path="${currentFile.file.path}">\n${currentFileContent}\n</current_tab_note>`
 			: undefined
 
 		// Count file and folder tokens
@@ -665,17 +785,17 @@ export class PromptGenerator {
 			}
 		}
 		if (isOverThreshold) {
-			console.log("isOverThreshold", isOverThreshold)
+			console.debug("isOverThreshold", isOverThreshold)
 			fileContentsPrompts = files.map((file) => {
-				return `<file_content path="${file.path}">\n(Content omitted due to token limit. Relevant sections will be provided by semantic search below.)\n</file_content>`
+				return `<user_mention_file path="${file.path}">\n(Content omitted due to token limit.\n</user_mention_file>`
 			}).join('\n')
 			folderContentsPrompts = (await Promise.all(folders.map(async (folder) => {
 				const tree_content = await getFolderTreeContent(folder)
-				return `<folder_content path="${folder.path}">\n${tree_content}\n(Content omitted due to token limit. Relevant sections will be provided by semantic search below.)\n</folder_content>`
+				return `<user_mention_folder path="${folder.path}">\n${tree_content}\n(Content omitted due to token limit.\n</user_mention_folder>`
 			}))).join('\n')
 		}
 
-		const shouldUseRAG = useVaultSearch || isOverThreshold
+		const shouldUseRAG = useVaultSearch
 		let similaritySearchContents
 		if (shouldUseRAG) {
 			// 重置进度状态，准备进入RAG阶段
@@ -1017,7 +1137,7 @@ ${transcript.map((t) => `${t.offset}: ${t.text}`).join('\n')}`,
 		// 首先检查缓存
 		const cachedData = await this.convertDataManager.findBySource(url)
 		if (cachedData) {
-			console.log(`Using cached video conversion for: ${url}`)
+			console.debug(`Using cached video conversion for: ${url}`)
 			return [cachedData.content, cachedData.contentPath]
 		}
 
@@ -1059,7 +1179,7 @@ ${transcript.map((t) => `${t.offset}: ${t.text}`).join('\n')}`,
 		// 首先检查缓存
 		const cachedData = await this.convertDataManager.findBySource(file.path)
 		if (cachedData) {
-			console.log(`Using cached document conversion for: ${file.path}`)
+			console.debug(`Using cached document conversion for: ${file.path}`)
 			return [cachedData.content, cachedData.contentPath]
 		}
 
@@ -1294,7 +1414,7 @@ ${transcript.map((t) => `${t.offset}: ${t.text}`).join('\n')}`,
 				content,
 			})
 
-			console.log(`Saved conversion data to cache: ${source}`)
+			console.debug(`Saved conversion data to cache: ${source}`)
 		} catch (error) {
 			console.error('Failed to save conversion data to cache:', error)
 			throw error
@@ -1326,7 +1446,7 @@ ${transcript.map((t) => `${t.offset}: ${t.text}`).join('\n')}`,
 			// 创建图片文件
 			await this.app.vault.createBinary(targetPath, bytes.buffer)
 
-			console.log(`Image saved: ${targetPath}`)
+			console.debug(`Image saved: ${targetPath}`)
 			return targetPath
 		} catch (error) {
 			console.error(`Failed to save image to ${targetPath}:`, error)

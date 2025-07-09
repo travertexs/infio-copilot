@@ -8,6 +8,8 @@ import { InfioSettings } from "../../types/settings";
 // import { PROVIDERS } from '../constants';
 import { GetAllProviders, GetEmbeddingProviderModelIds, GetEmbeddingProviders, GetProviderModelIds } from "../../utils/api";
 
+import { getProviderSettingKey } from "./ModelProviderSettings";
+
 type TextSegment = {
 	text: string;
 	isHighlighted: boolean;
@@ -21,6 +23,7 @@ type SearchableItem = {
 type HighlightedItem = {
 	id: string;
 	html: TextSegment[];
+	isCustom?: boolean;
 };
 
 // Type guard for Record<string, unknown>
@@ -154,7 +157,7 @@ export type ComboBoxComponentProps = {
 	settings?: InfioSettings | null;
 	isEmbedding?: boolean,
 	description?: string;
-	updateModel: (provider: ApiProvider, modelId: string) => void;
+	updateModel: (provider: ApiProvider, modelId: string, isCustom?: boolean) => void;
 };
 
 export const ComboBoxComponent: React.FC<ComboBoxComponentProps> = ({
@@ -178,24 +181,49 @@ export const ComboBoxComponent: React.FC<ComboBoxComponentProps> = ({
 
 	const [modelIds, setModelIds] = useState<string[]>([]);
 
+	// 统一处理模型选择和保存
+	const handleModelSelect = (provider: ApiProvider, modelId: string, isCustom?: boolean) => {
+		console.debug(`handleModelSelect: ${provider} -> ${modelId}`)
+
+		// 检查是否是自定义模型（不在官方模型列表中）
+		// const isCustomModel = !modelIds.includes(modelId);
+
+		updateModel(provider, modelId, isCustom);
+	};
+
 	// Replace useMemo with useEffect for async fetching
 	useEffect(() => {
 		const fetchModelIds = async () => {
 			const ids = isEmbedding
 				? GetEmbeddingProviderModelIds(modelProvider)
 				: await GetProviderModelIds(modelProvider, settings);
+			console.debug(`📝 Fetched ${ids.length} official models for ${modelProvider}:`, ids);
 			setModelIds(ids);
 		};
 
 		fetchModelIds();
 	}, [modelProvider, isEmbedding, settings]);
 
+	const combinedModelIds = useMemo(() => {
+		const providerKey = getProviderSettingKey(modelProvider);
+		const providerModels = settings?.[providerKey]?.models;
+		console.debug(`🔍 Custom models in settings for ${modelProvider}:`, providerModels || 'none')
+		// Ensure providerModels is an array of strings
+		if (!providerModels || !Array.isArray(providerModels)) {
+			console.debug(`📋 Using only official models (${modelIds.length}):`, modelIds);
+			return modelIds;
+		}
+		const additionalModels = providerModels.filter((model): model is string => typeof model === 'string');
+		console.debug(`📋 Combined models: ${modelIds.length} official + ${additionalModels.length} custom`);
+		return [...modelIds, ...additionalModels];
+	}, [modelIds, settings, modelProvider]);
+
 	const searchableItems = useMemo(() => {
-		return modelIds.map((id) => ({
-			id,
-			html: id,
+		return combinedModelIds.map((id): SearchableItem => ({
+			id: String(id),
+			html: String(id),
 		}))
-	}, [modelIds])
+	}, [combinedModelIds])
 
 	// fuse, used for fuzzy search, simple configuration threshold can be adjusted as needed
 	const fuse: Fuse<SearchableItem> = useMemo(() => {
@@ -212,24 +240,25 @@ export const ComboBoxComponent: React.FC<ComboBoxComponentProps> = ({
 
 	// 根据 searchTerm 得到过滤后的数据列表
 	const filteredOptions = useMemo(() => {
-		let results: HighlightedItem[] = searchTerm
+		const results: HighlightedItem[] = searchTerm
 			? highlight(fuse.search(searchTerm))
 			: searchableItems.map(item => ({
 				...item,
 				html: typeof item.html === 'string' ? [{ text: item.html, isHighlighted: false }] : item.html
 			}))
-		
+
 		// 如果有搜索词，添加自定义选项（如果不存在完全匹配的话）
 		if (searchTerm && searchTerm.trim()) {
 			const exactMatch = searchableItems.some(item => item.id === searchTerm);
 			if (!exactMatch) {
 				results.unshift({
 					id: searchTerm,
-					html: [{ text: `${modelIds.length > 0 ? t("settings.ModelProvider.custom") : ''}${searchTerm}`, isHighlighted: false }]
+					html: [{ text: `${modelIds.length > 0 ? t("settings.ModelProvider.custom") : ''}${searchTerm}`, isHighlighted: false }],
+					isCustom: true
 				});
 			}
 		}
-		
+
 		return results
 	}, [searchableItems, searchTerm, fuse, modelIds.length])
 
@@ -251,12 +280,14 @@ export const ComboBoxComponent: React.FC<ComboBoxComponentProps> = ({
 		// Use proper type checking without type assertion
 		const availableProviders = providers;
 		const isValidProvider = (value: string): value is ApiProvider => {
-			// @ts-ignore
-			return (availableProviders as readonly string[]).includes(value);
+			// @ts-expect-error - checking if providers array includes the value
+			return availableProviders.includes(value);
 		};
-		
+
 		if (isValidProvider(newProvider)) {
 			setModelProvider(newProvider);
+			// 当提供商变更时，清空模型选择让用户重新选择
+			updateModel(newProvider, '', false);
 		}
 	};
 
@@ -346,11 +377,11 @@ export const ComboBoxComponent: React.FC<ComboBoxComponentProps> = ({
 													if (filteredOptions.length > 0) {
 														const selectedOption = filteredOptions[selectedIndex];
 														if (selectedOption) {
-															updateModel(modelProvider, selectedOption.id);
+															handleModelSelect(modelProvider, selectedOption.id, selectedOption.isCustom);
 														}
 													} else if (searchTerm.trim()) {
 														// If no options but there is input content, use the input content directly
-														updateModel(modelProvider, searchTerm.trim());
+														handleModelSelect(modelProvider, searchTerm.trim(), true);
 													}
 													setSearchTerm("");
 													setIsOpen(false);
@@ -373,7 +404,7 @@ export const ComboBoxComponent: React.FC<ComboBoxComponentProps> = ({
 													ref={(el) => (itemRefs.current[index] = el)}
 													onMouseEnter={() => setSelectedIndex(index)}
 													onClick={() => {
-														updateModel(modelProvider, option.id);
+														handleModelSelect(modelProvider, option.id, option.isCustom);
 														setSearchTerm("");
 														setIsOpen(false);
 													}}

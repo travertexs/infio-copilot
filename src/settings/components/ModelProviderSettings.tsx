@@ -4,7 +4,10 @@ import { t } from '../../lang/helpers';
 import InfioPlugin from "../../main";
 import { ApiProvider } from '../../types/llm/model';
 import { InfioSettings } from '../../types/settings';
-import { GetAllProviders, GetDefaultModelId, GetEmbeddingProviders } from '../../utils/api';
+import {
+	GetAllProviders, GetDefaultModelId, GetEmbeddingProviders,
+	localProviderDefaultEmbeddingModelId
+} from '../../utils/api';
 import { getProviderApiUrl } from '../../utils/provider-urls';
 
 import { ApiKeyComponent, CustomUrlComponent } from './FormComponents';
@@ -27,7 +30,8 @@ type ProviderSettingKey =
 	| 'groqProvider'
 	| 'grokProvider'
 	| 'ollamaProvider'
-	| 'openaicompatibleProvider';
+	| 'openaicompatibleProvider'
+	| 'localproviderProvider';
 
 const keyMap: Record<ApiProvider, ProviderSettingKey> = {
 	'Infio': 'infioProvider',
@@ -42,9 +46,10 @@ const keyMap: Record<ApiProvider, ProviderSettingKey> = {
 	'Grok': 'grokProvider',
 	'Ollama': 'ollamaProvider',
 	'OpenAICompatible': 'openaicompatibleProvider',
+	'LocalProvider': 'localproviderProvider',
 };
 
-const getProviderSettingKey = (provider: ApiProvider): ProviderSettingKey => {
+export const getProviderSettingKey = (provider: ApiProvider): ProviderSettingKey => {
 	return keyMap[provider];
 };
 
@@ -66,11 +71,11 @@ const CustomProviderSettings: React.FC<CustomProviderSettingsProps> = ({ plugin,
 	};
 
 	const providers = GetAllProviders(); // 按照重要程度排序
-	const embeddingProviders = GetEmbeddingProviders(); // 按照重要程度排序
+	// const embeddingProviders = GetEmbeddingProviders(); // 按照重要程度排序
 
 	// 获取已设置API Key的提供商列表
 	const getSettedProviders = (): ApiProvider[] => {
-		return providers.filter(provider => {			
+		return providers.filter(provider => {
 			const providerSetting = getProviderSetting(provider);
 			return providerSetting.apiKey && providerSetting.apiKey.trim() !== '';
 		});
@@ -79,7 +84,7 @@ const CustomProviderSettings: React.FC<CustomProviderSettingsProps> = ({ plugin,
 	// 一键配置模型
 	const handleOneClickConfig = () => {
 		const settedProviders = getSettedProviders();
-		
+
 		if (settedProviders.length === 0) {
 			// 提示用户未设置任何key
 			alert(t("settings.ModelProvider.noApiKeySet"));
@@ -88,9 +93,10 @@ const CustomProviderSettings: React.FC<CustomProviderSettingsProps> = ({ plugin,
 
 		// 选择chat和autocomplete的提供商（按providers排序选择最靠前的）
 		const selectedProvider = providers.find(provider => settedProviders.includes(provider));
-		
+
 		// 选择embedding的提供商（按embeddingProviders排序选择最靠前的）
-		const embeddingProvider = embeddingProviders.find(provider => settedProviders.includes(provider));
+		// const embeddingProvider = embeddingProviders.find(provider => settedProviders.includes(provider));
+		const embeddingProvider = ApiProvider.LocalProvider; // default to local provider
 
 		// 准备要更新的设置对象
 		const newSettings = { ...settings };
@@ -98,32 +104,44 @@ const CustomProviderSettings: React.FC<CustomProviderSettingsProps> = ({ plugin,
 
 		if (selectedProvider) {
 			const defaultModels = GetDefaultModelId(selectedProvider);
-			
-			// 设置chat和autocomplete模型
+
+			// 设置chat、insight和autocomplete模型
 			if (defaultModels.chat) {
 				newSettings.chatModelProvider = selectedProvider;
 				newSettings.chatModelId = defaultModels.chat;
 				hasUpdates = true;
-				console.log(t("settings.ModelProvider.chatModelConfigured", { provider: selectedProvider, model: defaultModels.chat }));
+				console.debug(t("settings.ModelProvider.chatModelConfigured", { provider: selectedProvider, model: defaultModels.chat }));
+			}
+			if (defaultModels.insight) {
+				newSettings.insightModelProvider = selectedProvider;
+				newSettings.insightModelId = defaultModels.insight;
+				hasUpdates = true;
+				console.debug(t("settings.ModelProvider.insightModelConfigured", { provider: selectedProvider, model: defaultModels.insight }));
 			}
 			if (defaultModels.autoComplete) {
 				newSettings.applyModelProvider = selectedProvider;
 				newSettings.applyModelId = defaultModels.autoComplete;
 				hasUpdates = true;
-				console.log(t("settings.ModelProvider.autocompleteModelConfigured", { provider: selectedProvider, model: defaultModels.autoComplete }));
+				console.debug(t("settings.ModelProvider.autocompleteModelConfigured", { provider: selectedProvider, model: defaultModels.autoComplete }));
 			}
 		}
 
+		// todo: this is a temporary fix for the embedding provider, we should remove this after the embedding provider is implemented
 		if (embeddingProvider) {
 			const embeddingDefaultModels = GetDefaultModelId(embeddingProvider);
-			
+
 			// 设置embedding模型
 			if (embeddingDefaultModels.embedding) {
 				newSettings.embeddingModelProvider = embeddingProvider;
 				newSettings.embeddingModelId = embeddingDefaultModels.embedding;
 				hasUpdates = true;
-				console.log(t("settings.ModelProvider.embeddingModelConfigured", { provider: embeddingProvider, model: embeddingDefaultModels.embedding }));
+				console.debug(t("settings.ModelProvider.embeddingModelConfigured", { provider: embeddingProvider, model: embeddingDefaultModels.embedding }));
 			}
+		} else { // use local provider
+			newSettings.embeddingModelProvider = ApiProvider.LocalProvider;
+			newSettings.embeddingModelId = localProviderDefaultEmbeddingModelId;
+			hasUpdates = true;
+			console.debug(t("settings.ModelProvider.embeddingModelConfigured", { provider: ApiProvider.LocalProvider, model: localProviderDefaultEmbeddingModelId }));
 		}
 
 		// 一次性更新所有设置
@@ -171,37 +189,37 @@ const CustomProviderSettings: React.FC<CustomProviderSettingsProps> = ({ plugin,
 		});
 	};
 
-	const testApiConnection = async (provider: ApiProvider) => {
-		console.log(`Testing connection for ${provider}...`);
-		
+	const testApiConnection = async (provider: ApiProvider, modelId?: string) => {
+		console.debug(`Testing connection for ${provider}...`);
+
 		try {
 			// 动态导入LLMManager以避免循环依赖
 			const { default: LLMManager } = await import('../../core/llm/manager');
 			const { GetDefaultModelId } = await import('../../utils/api');
-			
+
 			// 对于Ollama和OpenAICompatible，不支持测试API连接
 			if (provider === ApiProvider.Ollama || provider === ApiProvider.OpenAICompatible) {
 				throw new Error(t("settings.ModelProvider.testConnection.notSupported", { provider }));
 			}
-			
+
 			// 创建LLM管理器实例
 			const llmManager = new LLMManager(settings);
-			
+
 			// 获取提供商的默认聊天模型
 			const defaultModels = GetDefaultModelId(provider);
-			const testModelId = defaultModels.chat;
-			
+			const testModelId = modelId || defaultModels.chat;
+
 			// 对于没有默认模型的提供商，使用通用的测试模型
 			if (!testModelId) {
 				throw new Error(t("settings.ModelProvider.testConnection.noDefaultModel", { provider }));
 			}
-			
+
 			// 构造测试模型对象
 			const testModel = {
 				provider: provider,
 				modelId: testModelId
 			};
-			
+
 			// 构造简单的测试请求
 			const testRequest = {
 				messages: [
@@ -214,11 +232,11 @@ const CustomProviderSettings: React.FC<CustomProviderSettingsProps> = ({ plugin,
 				max_tokens: 10,
 				temperature: 0
 			};
-			
+
 			// 设置超时选项
 			const abortController = new AbortController();
 			const timeoutId = setTimeout(() => abortController.abort(), 10000); // 10秒超时
-			
+
 			try {
 				// 发起API调用测试
 				const response = await llmManager.generateResponse(
@@ -226,12 +244,12 @@ const CustomProviderSettings: React.FC<CustomProviderSettingsProps> = ({ plugin,
 					testRequest,
 					{ signal: abortController.signal }
 				);
-				
+
 				clearTimeout(timeoutId);
-				
+
 				// 检查响应是否有效
 				if (response && response.choices && response.choices.length > 0) {
-					console.log(`✅ ${provider} connection test successful:`, response.choices[0]?.message?.content);
+					console.debug(`✅ ${provider} connection test successful:`, response.choices[0]?.message?.content);
 					// ApiKeyComponent expects no return value on success, just no thrown error
 					return;
 				} else {
@@ -241,13 +259,13 @@ const CustomProviderSettings: React.FC<CustomProviderSettingsProps> = ({ plugin,
 				clearTimeout(timeoutId);
 				throw apiError;
 			}
-			
+
 		} catch (error) {
 			console.error(`❌ ${provider} connection test failed:`, error);
-			
+
 			// 根据错误类型提供更具体的错误信息
 			let errorMessage = t("settings.ModelProvider.testConnection.connectionFailed");
-			
+
 			if (error.message?.includes('API key')) {
 				errorMessage = t("settings.ModelProvider.testConnection.invalidApiKey");
 			} else if (error.message?.includes('base URL') || error.message?.includes('baseURL')) {
@@ -285,27 +303,95 @@ const CustomProviderSettings: React.FC<CustomProviderSettingsProps> = ({ plugin,
 		return settings[providerKey] || {};
 	};
 
-	const updateChatModelId = (provider: ApiProvider, modelId: string) => {
+	const updateChatModelId = (
+		provider: ApiProvider,
+		modelId: string,
+		isCustom: boolean = false
+	) => {
+		console.debug(`updateChatModelId: ${provider} -> ${modelId}, isCustom: ${isCustom}`)
+		const providerSettingKey = getProviderSettingKey(provider);
+		const providerSettings = settings[providerSettingKey] || {};
+		const currentModels = providerSettings.models || [];
+
+		// 如果是自定义模型且不在列表中，则添加
+		const updatedModels = isCustom && !currentModels.includes(modelId)
+			? [...currentModels, modelId]
+			: currentModels;
+
 		handleSettingsUpdate({
 			...settings,
 			chatModelProvider: provider,
-			chatModelId: modelId
+			chatModelId: modelId,
+			[providerSettingKey]: {
+				...providerSettings,
+				models: updatedModels
+			}
 		});
 	};
 
-	const updateApplyModelId = (provider: ApiProvider, modelId: string) => {
+	const updateApplyModelId = (provider: ApiProvider, modelId: string, isCustom: boolean = false) => {
+		console.debug(`updateApplyModelId: ${provider} -> ${modelId}, isCustom: ${isCustom}`)
+		const providerSettingKey = getProviderSettingKey(provider);
+		const providerSettings = settings[providerSettingKey] || {};
+		const currentModels = providerSettings.models || [];
+
+		// 如果是自定义模型且不在列表中，则添加
+		const updatedModels = isCustom && !currentModels.includes(modelId)
+			? [...currentModels, modelId]
+			: currentModels;
+
 		handleSettingsUpdate({
 			...settings,
 			applyModelProvider: provider,
-			applyModelId: modelId
+			applyModelId: modelId,
+			[providerSettingKey]: {
+				...providerSettings,
+				models: updatedModels
+			}
 		});
 	};
 
-	const updateEmbeddingModelId = (provider: ApiProvider, modelId: string) => {
+	const updateEmbeddingModelId = (provider: ApiProvider, modelId: string, isCustom: boolean = false) => {
+		console.debug(`updateEmbeddingModelId: ${provider} -> ${modelId}, isCustom: ${isCustom}`)
+		const providerSettingKey = getProviderSettingKey(provider);
+		const providerSettings = settings[providerSettingKey] || {};
+		const currentModels = providerSettings.models || [];
+
+		// 如果是自定义模型且不在列表中，则添加
+		const updatedModels = isCustom && !currentModels.includes(modelId)
+			? [...currentModels, modelId]
+			: currentModels;
+
 		handleSettingsUpdate({
 			...settings,
 			embeddingModelProvider: provider,
-			embeddingModelId: modelId
+			embeddingModelId: modelId,
+			[providerSettingKey]: {
+				...providerSettings,
+				models: updatedModels
+			}
+		});
+	};
+
+	const updateInsightModelId = (provider: ApiProvider, modelId: string, isCustom: boolean = false) => {
+		console.debug(`updateInsightModelId: ${provider} -> ${modelId}, isCustom: ${isCustom}`)
+		const providerSettingKey = getProviderSettingKey(provider);
+		const providerSettings = settings[providerSettingKey] || {};
+		const currentModels = providerSettings.models || [];
+
+		// 如果是自定义模型且不在列表中，则添加
+		const updatedModels = isCustom && !currentModels.includes(modelId)
+			? [...currentModels, modelId]
+			: currentModels;
+
+		handleSettingsUpdate({
+			...settings,
+			insightModelProvider: provider,
+			insightModelId: modelId,
+			[providerSettingKey]: {
+				...providerSettings,
+				models: updatedModels
+			}
 		});
 	};
 
@@ -313,7 +399,7 @@ const CustomProviderSettings: React.FC<CustomProviderSettingsProps> = ({ plugin,
 	const generateApiKeyDescription = (provider: ApiProvider): React.ReactNode => {
 		const apiUrl = getProviderApiUrl(provider);
 		const baseDescription = String(t("settings.ApiProvider.enterApiKeyDescription"));
-		
+
 		if (!apiUrl) {
 			// 如果没有URL，直接移除占位符
 			return baseDescription.replace('{provider_api_url}', '');
@@ -328,9 +414,9 @@ const CustomProviderSettings: React.FC<CustomProviderSettingsProps> = ({ plugin,
 		return (
 			<>
 				{parts[0]}
-				<a 
-					href={apiUrl} 
-					target="_blank" 
+				<a
+					href={apiUrl}
+					target="_blank"
 					rel="noopener noreferrer"
 					className="provider-api-link"
 				>
@@ -346,25 +432,43 @@ const CustomProviderSettings: React.FC<CustomProviderSettingsProps> = ({ plugin,
 
 		return (
 			<div className="provider-config">
-				{provider !== ApiProvider.Ollama && (
-					<ApiKeyComponent
-						name={t("settings.ModelProvider.setApiKey", { provider })}
-						placeholder={t("settings.ApiProvider.enterApiKey")}
-						description={generateApiKeyDescription(provider)}
-						value={providerSetting.apiKey || ''}
-						onChange={(value) => updateProviderApiKey(provider, value)}
-						onTest={() => testApiConnection(provider)}
-					/>
-				)}
+				{provider === ApiProvider.LocalProvider ? (
+					<div className="local-provider-info">
+						<p className="local-provider-description">
+							{t("settings.ModelProvider.localProviderDescription")}
+						</p>
+						<div className="local-provider-features">
+							<ul>
+								<li>• {t("settings.ModelProvider.localProviderFeature0")}</li>
+								<li>• {t("settings.ModelProvider.localProviderFeature1")}</li>
+								<li>• {t("settings.ModelProvider.localProviderFeature2")}</li>
+								<li>• {t("settings.ModelProvider.localProviderFeature3")}</li>
+							</ul>
+						</div>
+					</div>
+				) : (
+					<>
+						{provider !== ApiProvider.Ollama && (
+							<ApiKeyComponent
+								name={t("settings.ModelProvider.setApiKey", { provider })}
+								placeholder={t("settings.ApiProvider.enterApiKey")}
+								description={generateApiKeyDescription(provider)}
+								value={providerSetting.apiKey || ''}
+								onChange={(value) => updateProviderApiKey(provider, value)}
+								onTest={() => testApiConnection(provider)}
+							/>
+						)}
 
-				<CustomUrlComponent
-					name={t("settings.ApiProvider.useCustomBaseUrl")}
-					placeholder={t("settings.ApiProvider.enterCustomUrl")}
-					useCustomUrl={providerSetting.useCustomUrl || false}
-					baseUrl={providerSetting.baseUrl || ''}
-					onToggleCustomUrl={(value) => updateProviderUseCustomUrl(provider, value)}
-					onChangeBaseUrl={(value) => updateProviderBaseUrl(provider, value)}
-				/>
+						<CustomUrlComponent
+							name={t("settings.ApiProvider.useCustomBaseUrl")}
+							placeholder={t("settings.ApiProvider.enterCustomUrl")}
+							useCustomUrl={providerSetting.useCustomUrl || false}
+							baseUrl={providerSetting.baseUrl || ''}
+							onToggleCustomUrl={(value) => updateProviderUseCustomUrl(provider, value)}
+							onChangeBaseUrl={(value) => updateProviderBaseUrl(provider, value)}
+						/>
+					</>
+				)}
 			</div>
 		);
 	};
@@ -398,7 +502,7 @@ const CustomProviderSettings: React.FC<CustomProviderSettingsProps> = ({ plugin,
 			<div className="model-selection-section">
 				<div className="model-selection-header">
 					<h2 className="section-title">{t("settings.ModelProvider.modelSelection")}:</h2>
-					<button 
+					<button
 						className="one-click-config-btn"
 						onClick={handleOneClickConfig}
 						title={t("settings.ModelProvider.oneClickConfigTooltip")}
@@ -415,6 +519,15 @@ const CustomProviderSettings: React.FC<CustomProviderSettingsProps> = ({ plugin,
 						provider={settings.chatModelProvider || ApiProvider.OpenAI}
 						modelId={settings.chatModelId}
 						updateModel={updateChatModelId}
+					/>
+
+					<ComboBoxComponent
+						name={t("settings.Models.insightModel")}
+						description={t("settings.Models.insightModelDescription")}
+						settings={settings}
+						provider={settings.insightModelProvider || ApiProvider.Infio}
+						modelId={settings.insightModelId}
+						updateModel={updateInsightModelId}
 					/>
 
 					<ComboBoxComponent
@@ -636,6 +749,43 @@ const CustomProviderSettings: React.FC<CustomProviderSettingsProps> = ({ plugin,
 				.theme-dark .provider-config-section,
 				.theme-dark .model-selection-section {
 					background: var(--background-primary-alt);
+					border-color: var(--background-modifier-border-hover);
+				}
+
+				/* LocalProvider 特殊样式 */
+				.local-provider-info {
+					padding: var(--size-4-3);
+					background: var(--background-secondary);
+					border-radius: var(--radius-m);
+					border: 1px solid var(--background-modifier-border);
+				}
+
+				.local-provider-description {
+					color: var(--text-normal);
+					font-size: var(--font-ui-medium);
+					margin-bottom: var(--size-4-2);
+					line-height: 1.5;
+				}
+
+				.local-provider-features {
+					margin-top: var(--size-4-2);
+				}
+
+				.local-provider-features ul {
+					list-style: none;
+					padding: 0;
+					margin: 0;
+					color: var(--text-muted);
+				}
+
+				.local-provider-features li {
+					padding: var(--size-2-1) 0;
+					font-size: var(--font-ui-small);
+					line-height: 1.4;
+				}
+
+				.theme-dark .local-provider-info {
+					background: var(--background-secondary-alt);
 					border-color: var(--background-modifier-border-hover);
 				}
 				`}

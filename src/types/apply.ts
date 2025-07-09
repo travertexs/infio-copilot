@@ -105,4 +105,30 @@ export type UseMcpToolArgs = {
 	parameters: Record<string, unknown>;
 }
 
-export type ToolArgs = ReadFileToolArgs | WriteToFileToolArgs | InsertContentToolArgs | SearchAndReplaceToolArgs | ListFilesToolArgs | MatchSearchFilesToolArgs | RegexSearchFilesToolArgs | SemanticSearchFilesToolArgs | SearchWebToolArgs | FetchUrlsContentToolArgs | SwitchModeToolArgs | ApplyDiffToolArgs | UseMcpToolArgs;
+export type DataviewQueryToolArgs = {
+	type: 'dataview_query';
+	query: string;
+	outputFormat: string;
+	finish?: boolean;
+}
+
+export type CallTransformationsToolArgs = {
+	type: 'call_transformations';
+	path: string;
+	transformation: string;
+	finish?: boolean;
+}
+
+export type ManageFilesToolArgs = {
+	type: 'manage_files';
+	operations: Array<{
+		action: 'create_folder' | 'move' | 'delete' | 'copy' | 'rename';
+		path?: string;
+		source_path?: string;
+		destination_path?: string;
+		new_name?: string;
+	}>;
+	finish?: boolean;
+}
+
+export type ToolArgs = ReadFileToolArgs | WriteToFileToolArgs | InsertContentToolArgs | SearchAndReplaceToolArgs | ListFilesToolArgs | MatchSearchFilesToolArgs | RegexSearchFilesToolArgs | SemanticSearchFilesToolArgs | SearchWebToolArgs | FetchUrlsContentToolArgs | SwitchModeToolArgs | ApplyDiffToolArgs | UseMcpToolArgs | DataviewQueryToolArgs | CallTransformationsToolArgs | ManageFilesToolArgs;

@@ -1,4 +1,3 @@
-
 import * as path from 'path'
 
 import { App, normalizePath } from 'obsidian'
@@ -10,9 +9,9 @@ import {
 	ModeConfig,
 	PromptComponent,
 	defaultModeSlug,
+	defaultModes,
 	getGroupName,
-	getModeBySlug,
-	defaultModes
+	getModeBySlug
 } from "../../utils/modes"
 import { DiffStrategy } from "../diff/DiffStrategy"
 import { McpHub } from "../mcp/McpHub"
@@ -27,8 +26,7 @@ import {
 	getObjectiveSection,
 	getRulesSection,
 	getSharedToolUseSection,
-	getSystemInfoSection,
-	getToolUseGuidelinesSection,
+	getToolUseGuidelinesSection
 } from "./sections"
 // import { loadSystemPromptFile } from "./sections/custom-system-prompt"
 import { getToolDescriptionsForMode } from "./tools"
@@ -82,12 +80,6 @@ export class SystemPrompt {
 		experiments?: Record<string, boolean>,
 		enableMcpServerCreation?: boolean,
 	): Promise<string> {
-		// if (!context) {
-		// 	throw new Error("Extension context is required for generating system prompt")
-		// }
-
-		// // If diff is disabled, don't pass the diffStrategy
-		// const effectiveDiffStrategy = diffEnabled ? diffStrategy : undefined
 
 		// Get the full mode config to ensure we have the role definition
 		const modeConfig = getModeBySlug(mode, customModeConfigs) || defaultModes.find((m) => m.slug === mode) || defaultModes[0]
@@ -117,7 +109,7 @@ ${getToolDescriptionsForMode(
 			experiments,
 		)}
 
-${getToolUseGuidelinesSection()}
+${getToolUseGuidelinesSection(mode)}
 
 ${mcpServersSection}
 
@@ -137,8 +129,6 @@ ${getRulesSection(
 			diffStrategy,
 			experiments,
 		)}
-
-${getSystemInfoSection(cwd)}
 
 ${getObjectiveSection(mode)}
 
@@ -167,7 +157,7 @@ ${await addCustomInstructions(this.app, promptComponent?.customInstructions || m
 
 		const getPromptComponent = (value: unknown): PromptComponent | undefined => {
 			if (typeof value === "object" && value !== null) {
-				return value as PromptComponent
+				return value
 			}
 			return undefined
 		}

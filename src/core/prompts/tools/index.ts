@@ -1,14 +1,16 @@
+import { FileSearchSettings } from "../../../types/settings"
 import { Mode, ModeConfig, getGroupName, getModeConfig, isToolAllowedForMode } from "../../../utils/modes"
 import { DiffStrategy } from "../../diff/DiffStrategy"
 import { McpHub } from "../../mcp/McpHub"
-import { FileSearchSettings } from "../../../types/settings"
-
 import { getAccessMcpResourceDescription } from "./access-mcp-resource"
 import { getAskFollowupQuestionDescription } from "./ask-followup-question"
 import { getAttemptCompletionDescription } from "./attempt-completion"
+import { getCallInsightsDescription } from "./call-insights"
+import { getDataviewQueryDescription } from "./dataview-query"
 import { getFetchUrlsContentDescription } from "./fetch-url-content"
 import { getInsertContentDescription } from "./insert-content"
 import { getListFilesDescription } from "./list-files"
+import { getManageFilesDescription } from "./manage-files"
 import { getReadFileDescription } from "./read-file"
 import { getSearchAndReplaceDescription } from "./search-and-replace"
 import { getSearchFilesDescription } from "./search-files"
@@ -25,6 +27,8 @@ const toolDescriptionMap: Record<string, (args: ToolArgs) => string | undefined>
 	write_to_file: (args) => getWriteToFileDescription(args),
 	search_files: (args) => getSearchFilesDescription(args),
 	list_files: (args) => getListFilesDescription(args),
+	insights: (args) => getCallInsightsDescription(args),
+	dataview_query: (args) => getDataviewQueryDescription(args),
 	ask_followup_question: () => getAskFollowupQuestionDescription(),
 	attempt_completion: () => getAttemptCompletionDescription(),
 	switch_mode: () => getSwitchModeDescription(),
@@ -32,6 +36,7 @@ const toolDescriptionMap: Record<string, (args: ToolArgs) => string | undefined>
 	use_mcp_tool: (args) => getUseMcpToolDescription(args),
 	access_mcp_resource: (args) => getAccessMcpResourceDescription(args),
 	search_and_replace: (args) => getSearchAndReplaceDescription(args),
+	manage_files: (args) => getManageFilesDescription(args),
 	apply_diff: (args) =>
 		args.diffStrategy ? args.diffStrategy.getToolDescription({ cwd: args.cwd, toolOptions: args.toolOptions }) : "",
 	search_web: (args): string | undefined => getSearchWebDescription(args),
@@ -50,7 +55,9 @@ export function getToolDescriptionsForMode(
 	customModes?: ModeConfig[],
 	experiments?: Record<string, boolean>,
 ): string {
+	// console.log("getToolDescriptionsForMode", mode, customModes)
 	const config = getModeConfig(mode, customModes)
+	// console.log("config", config)
 	const args: ToolArgs = {
 		cwd,
 		searchSettings,
@@ -67,6 +74,7 @@ export function getToolDescriptionsForMode(
 	config.groups.forEach((groupEntry) => {
 		const groupName = getGroupName(groupEntry)
 		const toolGroup = TOOL_GROUPS[groupName]
+		console.log("toolGroup", toolGroup)
 		if (toolGroup) {
 			toolGroup.tools.forEach((tool) => {
 				if (isToolAllowedForMode(tool, mode, customModes ?? [], experiments ?? {})) {
@@ -78,10 +86,11 @@ export function getToolDescriptionsForMode(
 
 	// Add always available tools
 	ALWAYS_AVAILABLE_TOOLS.forEach((tool) => tools.add(tool))
-
+	// console.log("tools", tools)
 	// Map tool descriptions for allowed tools
 	const descriptions = Array.from(tools).map((toolName) => {
 		const descriptionFn = toolDescriptionMap[toolName]
+		// console.log("descriptionFn", descriptionFn)
 		if (!descriptionFn) {
 			return undefined
 		}
@@ -97,6 +106,8 @@ export function getToolDescriptionsForMode(
 
 // Export individual description functions for backward compatibility
 export {
-	getAccessMcpResourceDescription, getAskFollowupQuestionDescription, getAttemptCompletionDescription, getInsertContentDescription, getListFilesDescription, getReadFileDescription, getSearchAndReplaceDescription, getSearchFilesDescription, getSwitchModeDescription, getUseMcpToolDescription, getWriteToFileDescription
+	getAccessMcpResourceDescription, getReadFileDescription, getWriteToFileDescription, getSearchFilesDescription, getListFilesDescription,
+	getDataviewQueryDescription, getAskFollowupQuestionDescription, getAttemptCompletionDescription, getSwitchModeDescription, getInsertContentDescription,
+	getUseMcpToolDescription, getSearchAndReplaceDescription, getManageFilesDescription, getSearchWebDescription, getFetchUrlsContentDescription, getCallInsightsDescription as getCallInsightsDescription
 }
 

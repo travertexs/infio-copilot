@@ -1,22 +1,26 @@
-import { backOff } from 'exponential-backoff'
-import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter'
-import { minimatch } from 'minimatch'
-import { App, Notice, TFile } from 'obsidian'
-import pLimit from 'p-limit'
+import { backOff } from 'exponential-backoff';
+import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
+import { minimatch } from 'minimatch';
+import { App, Notice, TFile } from 'obsidian';
+import pLimit from 'p-limit';
+import removeMarkdown from 'remove-markdown';
 
-import { IndexProgress } from '../../../components/chat-view/QueryProgress'
+import { IndexProgress } from '../../../components/chat-view/QueryProgress';
 import {
 	LLMAPIKeyInvalidException,
 	LLMAPIKeyNotSetException,
 	LLMBaseUrlNotSetException,
 	LLMRateLimitExceededException,
-} from '../../../core/llm/exception'
-import { InsertVector, SelectVector } from '../../../database/schema'
-import { EmbeddingModel } from '../../../types/embedding'
-import { openSettingsModalWithError } from '../../../utils/open-settings-modal'
-import { DBManager } from '../../database-manager'
+} from '../../../core/llm/exception';
+import { InsertVector, SelectVector } from '../../../database/schema';
+import { EmbeddingModel } from '../../../types/embedding';
+import { getFilesWithTag } from '../../../utils/glob-utils';
+import { openSettingsModalWithError } from '../../../utils/open-settings-modal';
+import { DBManager } from '../../database-manager';
+import { Workspace } from '../../json/workspace/types';
+import { vectorTables } from '../../schema';
 
-import { VectorRepository } from './vector-repository'
+import { VectorRepository } from './vector-repository';
 
 export class VectorManager {
 	private app: App
@@ -52,13 +56,57 @@ export class VectorManager {
 		)
 	}
 
+	async getWorkspaceStatistics(
+		embeddingModel: EmbeddingModel,
+		workspace?: Workspace
+	): Promise<{
+		totalFiles: number
+		totalChunks: number
+	}> {
+		// 构建工作区范围
+		let scope: { files: string[], folders: string[] } | undefined
+		if (workspace) {
+			const folders: string[] = []
+			const files: string[] = []
+
+			// 处理工作区中的文件夹和标签
+			for (const item of workspace.content) {
+				if (item.type === 'folder') {
+					folders.push(item.content)
+				} else if (item.type === 'tag') {
+					// 获取标签对应的所有文件
+					const tagFiles = getFilesWithTag(item.content, this.app)
+					files.push(...tagFiles)
+				}
+			}
+
+			// 只有当有文件夹或文件时才设置 scope
+			if (folders.length > 0 || files.length > 0) {
+				scope = { files, folders }
+			}
+		}
+
+		if (scope) {
+			return await this.repository.getWorkspaceStatistics(embeddingModel, scope)
+		} else {
+			return await this.repository.getVaultStatistics(embeddingModel)
+		}
+	}
+
+	async getVaultStatistics(embeddingModel: EmbeddingModel): Promise<{
+		totalFiles: number
+		totalChunks: number
+	}> {
+		return await this.repository.getVaultStatistics(embeddingModel)
+	}
+
 	// 强制垃圾回收的辅助方法
 	private forceGarbageCollection() {
 		try {
 			if (typeof global !== 'undefined' && global.gc) {
 				global.gc()
 			} else if (typeof window !== 'undefined' && (window as any).gc) {
-				(window as any).gc()
+				((window as any).gc as () => void)();
 			}
 		} catch (e) {
 			// 忽略垃圾回收错误
@@ -79,6 +127,7 @@ export class VectorManager {
 		embeddingModel: EmbeddingModel,
 		options: {
 			chunkSize: number
+			batchSize: number
 			excludePatterns: string[]
 			includePatterns: string[]
 			reindexAll?: boolean
@@ -87,6 +136,7 @@ export class VectorManager {
 	): Promise<void> {
 		let filesToIndex: TFile[]
 		if (options.reindexAll) {
+			console.log("updateVaultIndex reindexAll")
 			filesToIndex = await this.getFilesToIndex({
 				embeddingModel: embeddingModel,
 				excludePatterns: options.excludePatterns,
@@ -95,33 +145,47 @@ export class VectorManager {
 			})
 			await this.repository.clearAllVectors(embeddingModel)
 		} else {
+			console.log("updateVaultIndex for update files")
 			await this.cleanVectorsForDeletedFiles(embeddingModel)
+			console.log("updateVaultIndex cleanVectorsForDeletedFiles")
 			filesToIndex = await this.getFilesToIndex({
 				embeddingModel: embeddingModel,
 				excludePatterns: options.excludePatterns,
 				includePatterns: options.includePatterns,
 			})
+			console.log("get files to index: ", filesToIndex.length)
 			await this.repository.deleteVectorsForMultipleFiles(
 				filesToIndex.map((file) => file.path),
 				embeddingModel,
 			)
+			console.log("delete vectors for multiple files: ", filesToIndex.length)
 		}
+		console.log("get files to index: ", filesToIndex.length)
 
 		if (filesToIndex.length === 0) {
 			return
 		}
 
-		const textSplitter = RecursiveCharacterTextSplitter.fromLanguage(
-			'markdown',
-			{
-				chunkSize: options.chunkSize,
-				// TODO: Use token-based chunking after migrating to WebAssembly-based tiktoken
-				// Current token counting method is too slow for practical use
-				// lengthFunction: async (text) => {
-				//   return await tokenCount(text)
-				// },
-			},
-		)
+		// Embed the files
+		const overlap = Math.floor(options.chunkSize * 0.15)
+		const textSplitter = new RecursiveCharacterTextSplitter({
+			chunkSize: options.chunkSize,
+			chunkOverlap: overlap,
+			separators: [
+				"\n\n",
+				"\n",
+				".",
+				",",
+				" ",
+				"\u200b",  // Zero-width space
+				"\uff0c",  // Fullwidth comma
+				"\u3001",  // Ideographic comma
+				"\uff0e",  // Fullwidth full stop
+				"\u3002",  // Ideographic full stop
+				"",
+			],
+		});
+		console.log("textSplitter chunkSize: ", options.chunkSize, "overlap: ", overlap)
 
 		const skippedFiles: string[] = []
 		const contentChunks: InsertVector[] = (
@@ -134,18 +198,25 @@ export class VectorManager {
 						const fileDocuments = await textSplitter.createDocuments([
 							fileContent,
 						])
-						return fileDocuments.map((chunk): InsertVector => {
-							return {
-								path: file.path,
-								mtime: file.stat.mtime,
-								content: chunk.pageContent.replace(/\0/g, ''), // 再次清理，确保安全
-								embedding: [],
-								metadata: {
-									startLine: Number(chunk.metadata.loc.lines.from),
-									endLine: Number(chunk.metadata.loc.lines.to),
-								},
-							}
-						})
+						return fileDocuments
+							.map((chunk): InsertVector | null => {
+								// 保存原始内容，不在此处调用 removeMarkdown
+								const rawContent = chunk.pageContent.replace(/\0/g, '')
+								if (!rawContent || rawContent.trim().length === 0) {
+									return null
+								}
+								return {
+									path: file.path,
+									mtime: file.stat.mtime,
+									content: rawContent, // 保存原始内容
+									embedding: [],
+									metadata: {
+										startLine: Number(chunk.metadata.loc.lines.from),
+										endLine: Number(chunk.metadata.loc.lines.to),
+									},
+								}
+							})
+							.filter((chunk): chunk is InsertVector => chunk !== null)
 					} catch (error) {
 						console.warn(`跳过文件 ${file.path}:`, error.message)
 						skippedFiles.push(file.path)
@@ -154,6 +225,8 @@ export class VectorManager {
 				}),
 			)
 		).flat()
+
+		console.log("contentChunks: ", contentChunks.length)
 
 		if (skippedFiles.length > 0) {
 			console.warn(`跳过了 ${skippedFiles.length} 个有问题的文件:`, skippedFiles)
@@ -168,33 +241,42 @@ export class VectorManager {
 
 		const embeddingProgress = { completed: 0 }
 		// 减少批量大小以降低内存压力
-		const insertBatchSize = 32
+		const batchSize = Math.min(options.batchSize, 20) // 限制最大批量大小
 		let batchCount = 0
-		
+
 		try {
 			if (embeddingModel.supportsBatch) {
 				// 支持批量处理的提供商：使用流式处理逻辑
-				const embeddingBatchSize = 32 
-				
-				for (let i = 0; i < contentChunks.length; i += embeddingBatchSize) {
+				for (let i = 0; i < contentChunks.length; i += batchSize) {
 					batchCount++
-					const batchChunks = contentChunks.slice(i, Math.min(i + embeddingBatchSize, contentChunks.length))
-					const batchTexts = batchChunks.map(chunk => chunk.content)
-					
+					const batchChunks = contentChunks.slice(i, Math.min(i + batchSize, contentChunks.length))
+
 					const embeddedBatch: InsertVector[] = []
-					
+
 					await backOff(
 						async () => {
+							// 在嵌入之前处理 markdown
+							const cleanedBatchData = batchChunks.map(chunk => {
+								const cleanContent = removeMarkdown(chunk.content)
+								return { chunk, cleanContent }
+							}).filter(({ cleanContent }) => cleanContent && cleanContent.trim().length > 0)
+
+							if (cleanedBatchData.length === 0) {
+								return
+							}
+
+							const batchTexts = cleanedBatchData.map(({ cleanContent }) => cleanContent)
 							const batchEmbeddings = await embeddingModel.getBatchEmbeddings(batchTexts)
-							
+
 							// 合并embedding结果到chunk数据
-							for (let j = 0; j < batchChunks.length; j++) {
+							for (let j = 0; j < cleanedBatchData.length; j++) {
+								const { chunk, cleanContent } = cleanedBatchData[j]
 								const embeddedChunk: InsertVector = {
-									path: batchChunks[j].path,
-									mtime: batchChunks[j].mtime,
-									content: batchChunks[j].content,
+									path: chunk.path,
+									mtime: chunk.mtime,
+									content: cleanContent, // 使用已经清理过的内容
 									embedding: batchEmbeddings[j],
-									metadata: batchChunks[j].metadata,
+									metadata: chunk.metadata,
 								}
 								embeddedBatch.push(embeddedChunk)
 							}
@@ -207,13 +289,14 @@ export class VectorManager {
 						},
 					)
 
-					// 立即插入当前批次，避免内存累积
+					// 使用事务批量插入，减少数据库连接压力
 					if (embeddedBatch.length > 0) {
-						await this.repository.insertVectors(embeddedBatch, embeddingModel)
+						await this.insertVectorsWithTransaction(embeddedBatch, embeddingModel)
+						console.log("insert vectors with transaction success, batch size: ", embeddedBatch.length)
 						// 清理批次数据
 						embeddedBatch.length = 0
 					}
-					
+
 					embeddingProgress.completed += batchChunks.length
 					updateProgress?.({
 						completedChunks: embeddingProgress.completed,
@@ -221,24 +304,24 @@ export class VectorManager {
 						totalFiles: filesToIndex.length,
 					})
 
-					// 定期内存清理
-					await this.memoryCleanup(batchCount)
+					// 定期内存清理和延迟
+					await this.memoryCleanupWithDelay(batchCount)
 				}
 			} else {
-				// 不支持批量处理的提供商：使用流式处理逻辑
-				const limit = pLimit(32) // 从50降低到10，减少并发压力
+				// 不支持批量处理的提供商：大幅降低并发度
+				const limit = pLimit(8) // 从32降低到8，大幅减少并发压力
 				const abortController = new AbortController()
-				
+
 				// 流式处理：分批处理并立即插入
-				for (let i = 0; i < contentChunks.length; i += insertBatchSize) {
+				for (let i = 0; i < contentChunks.length; i += batchSize) {
 					if (abortController.signal.aborted) {
 						throw new Error('Operation was aborted')
 					}
-					
+
 					batchCount++
-					const batchChunks = contentChunks.slice(i, Math.min(i + insertBatchSize, contentChunks.length))
+					const batchChunks = contentChunks.slice(i, Math.min(i + batchSize, contentChunks.length))
 					const embeddedBatch: InsertVector[] = []
-					
+
 					const tasks = batchChunks.map((chunk) =>
 						limit(async () => {
 							if (abortController.signal.aborted) {
@@ -247,39 +330,46 @@ export class VectorManager {
 							try {
 								await backOff(
 									async () => {
-										const embedding = await embeddingModel.getEmbedding(chunk.content)
+										// 在嵌入之前处理 markdown
+										const cleanContent = removeMarkdown(chunk.content).replace(/\0/g, '')
+										// 跳过清理后为空的内容
+										if (!cleanContent || cleanContent.trim().length === 0) {
+											return
+										}
+
+										const embedding = await embeddingModel.getEmbedding(cleanContent)
 										const embeddedChunk = {
 											path: chunk.path,
 											mtime: chunk.mtime,
-											content: chunk.content,
+											content: cleanContent, // 使用清理后的内容
 											embedding,
 											metadata: chunk.metadata,
 										}
 										embeddedBatch.push(embeddedChunk)
 									},
 									{
-										numOfAttempts: 3, // 减少重试次数
-										startingDelay: 500, // 减少延迟
-										timeMultiple: 1.5,
+										numOfAttempts: 3,
+										startingDelay: 1000, // 增加延迟
+										timeMultiple: 2.0,
 										jitter: 'full',
 									},
 								)
 							} catch (error) {
-								abortController.abort()
-								throw error
+								console.error('Error in embedding task:', error)
+								// 不要立即中止，继续处理其他任务
 							}
 						}),
 					)
-					
+
 					await Promise.all(tasks)
-					
-					// 立即插入当前批次
+
+					// 使用事务批量插入
 					if (embeddedBatch.length > 0) {
-						await this.repository.insertVectors(embeddedBatch, embeddingModel)
+						await this.insertVectorsWithTransaction(embeddedBatch, embeddingModel)
 						// 清理批次数据
 						embeddedBatch.length = 0
 					}
-					
+
 					embeddingProgress.completed += batchChunks.length
 					updateProgress?.({
 						completedChunks: embeddingProgress.completed,
@@ -287,8 +377,291 @@ export class VectorManager {
 						totalFiles: filesToIndex.length,
 					})
 
-					// 定期内存清理
-					await this.memoryCleanup(batchCount)
+					// 定期内存清理和延迟
+					await this.memoryCleanupWithDelay(batchCount)
+				}
+			}
+		} catch (error) {
+			if (
+				error instanceof LLMAPIKeyNotSetException ||
+				error instanceof LLMAPIKeyInvalidException ||
+				error instanceof LLMBaseUrlNotSetException
+			) {
+				openSettingsModalWithError(this.app, error.message)
+			} else if (error instanceof LLMRateLimitExceededException) {
+				new Notice(error.message)
+			} else {
+				console.error('Error embedding chunks:', error)
+				throw error
+			}
+		} finally {
+			// 最终清理
+			this.forceGarbageCollection()
+		}
+	}
+
+	async updateWorkspaceIndex(
+		embeddingModel: EmbeddingModel,
+		workspace: Workspace,
+		options: {
+			chunkSize: number
+			batchSize: number
+			excludePatterns: string[]
+			includePatterns: string[]
+			reindexAll?: boolean
+		},
+		updateProgress?: (indexProgress: IndexProgress) => void,
+	): Promise<void> {
+		let filesToIndex: TFile[]
+		if (options.reindexAll) {
+			console.log("updateWorkspaceIndex reindexAll")
+			filesToIndex = await this.getFilesToIndexInWorkspace({
+				embeddingModel: embeddingModel,
+				workspace: workspace,
+				excludePatterns: options.excludePatterns,
+				includePatterns: options.includePatterns,
+				reindexAll: true,
+			})
+			// 只清理工作区相关的向量，而不是全部
+			const workspaceFilePaths = filesToIndex.map((file) => file.path)
+			if (workspaceFilePaths.length > 0) {
+				await this.repository.deleteVectorsForMultipleFiles(workspaceFilePaths, embeddingModel)
+			}
+		} else {
+			console.log("updateWorkspaceIndex for update files")
+			await this.cleanVectorsForDeletedFiles(embeddingModel)
+			console.log("updateWorkspaceIndex cleanVectorsForDeletedFiles")
+			filesToIndex = await this.getFilesToIndexInWorkspace({
+				embeddingModel: embeddingModel,
+				workspace: workspace,
+				excludePatterns: options.excludePatterns,
+				includePatterns: options.includePatterns,
+			})
+			console.log("get workspace files to index: ", filesToIndex.length)
+			await this.repository.deleteVectorsForMultipleFiles(
+				filesToIndex.map((file) => file.path),
+				embeddingModel,
+			)
+			console.log("delete vectors for workspace files: ", filesToIndex.length)
+		}
+		console.log("get workspace files to index: ", filesToIndex.length)
+
+		if (filesToIndex.length === 0) {
+			return
+		}
+
+		// Embed the files (使用与 updateVaultIndex 相同的逻辑)
+		const overlap = Math.floor(options.chunkSize * 0.15)
+		const textSplitter = new RecursiveCharacterTextSplitter({
+			chunkSize: options.chunkSize,
+			chunkOverlap: overlap,
+			separators: [
+				"\n\n",
+				"\n",
+				".",
+				",",
+				" ",
+				"\u200b",  // Zero-width space
+				"\uff0c",  // Fullwidth comma
+				"\u3001",  // Ideographic comma
+				"\uff0e",  // Fullwidth full stop
+				"\u3002",  // Ideographic full stop
+				"",
+			],
+		});
+		console.log("textSplitter chunkSize: ", options.chunkSize, "overlap: ", overlap)
+
+		const skippedFiles: string[] = []
+		const contentChunks: InsertVector[] = (
+			await Promise.all(
+				filesToIndex.map(async (file) => {
+					try {
+						let fileContent = await this.app.vault.cachedRead(file)
+						// 清理null字节，防止PostgreSQL UTF8编码错误
+						fileContent = fileContent.replace(/\0/g, '')
+						const fileDocuments = await textSplitter.createDocuments([
+							fileContent,
+						])
+						return fileDocuments
+							.map((chunk): InsertVector | null => {
+								// 保存原始内容，不在此处调用 removeMarkdown
+								const rawContent = chunk.pageContent.replace(/\0/g, '')
+								if (!rawContent || rawContent.trim().length === 0) {
+									return null
+								}
+								return {
+									path: file.path,
+									mtime: file.stat.mtime,
+									content: rawContent, // 保存原始内容
+									embedding: [],
+									metadata: {
+										startLine: Number(chunk.metadata.loc.lines.from),
+										endLine: Number(chunk.metadata.loc.lines.to),
+									},
+								}
+							})
+							.filter((chunk): chunk is InsertVector => chunk !== null)
+					} catch (error) {
+						console.warn(`跳过文件 ${file.path}:`, error.message)
+						skippedFiles.push(file.path)
+						return []
+					}
+				}),
+			)
+		).flat()
+
+		console.log("contentChunks: ", contentChunks.length)
+
+		if (skippedFiles.length > 0) {
+			console.warn(`跳过了 ${skippedFiles.length} 个有问题的文件:`, skippedFiles)
+			new Notice(`跳过了 ${skippedFiles.length} 个有问题的文件`)
+		}
+
+		updateProgress?.({
+			completedChunks: 0,
+			totalChunks: contentChunks.length,
+			totalFiles: filesToIndex.length,
+		})
+
+		const embeddingProgress = { completed: 0 }
+		// 减少批量大小以降低内存压力
+		const batchSize = Math.min(options.batchSize, 20) // 限制最大批量大小
+		let batchCount = 0
+
+		try {
+			if (embeddingModel.supportsBatch) {
+				// 支持批量处理的提供商：使用流式处理逻辑
+				for (let i = 0; i < contentChunks.length; i += batchSize) {
+					batchCount++
+					const batchChunks = contentChunks.slice(i, Math.min(i + batchSize, contentChunks.length))
+
+					const embeddedBatch: InsertVector[] = []
+
+					await backOff(
+						async () => {
+							// 在嵌入之前处理 markdown，只处理一次
+							const cleanedBatchData = batchChunks.map(chunk => {
+								const cleanContent = removeMarkdown(chunk.content)
+								return { chunk, cleanContent }
+							}).filter(({ cleanContent }) => cleanContent && cleanContent.trim().length > 0)
+
+							if (cleanedBatchData.length === 0) {
+								return
+							}
+
+							const batchTexts = cleanedBatchData.map(({ cleanContent }) => cleanContent)
+							const batchEmbeddings = await embeddingModel.getBatchEmbeddings(batchTexts)
+
+							// 合并embedding结果到chunk数据
+							for (let j = 0; j < cleanedBatchData.length; j++) {
+								const { chunk, cleanContent } = cleanedBatchData[j]
+								const embeddedChunk: InsertVector = {
+									path: chunk.path,
+									mtime: chunk.mtime,
+									content: cleanContent, // 使用已经清理过的内容
+									embedding: batchEmbeddings[j],
+									metadata: chunk.metadata,
+								}
+								embeddedBatch.push(embeddedChunk)
+							}
+						},
+						{
+							numOfAttempts: 3,
+							startingDelay: 1000, // 增加延迟
+							timeMultiple: 2.0,
+							jitter: 'full',
+						},
+					)
+
+					// 使用事务批量插入，减少数据库连接压力
+					if (embeddedBatch.length > 0) {
+						await this.insertVectorsWithTransaction(embeddedBatch, embeddingModel)
+						// 清理批次数据
+						embeddedBatch.length = 0
+					}
+
+					embeddingProgress.completed += batchChunks.length
+					updateProgress?.({
+						completedChunks: embeddingProgress.completed,
+						totalChunks: contentChunks.length,
+						totalFiles: filesToIndex.length,
+					})
+
+					// 定期内存清理和延迟
+					await this.memoryCleanupWithDelay(batchCount)
+				}
+			} else {
+				// 不支持批量处理的提供商：大幅降低并发度
+				const limit = pLimit(8) // 从32降低到8，大幅减少并发压力
+				const abortController = new AbortController()
+
+				// 流式处理：分批处理并立即插入
+				for (let i = 0; i < contentChunks.length; i += batchSize) {
+					if (abortController.signal.aborted) {
+						throw new Error('Operation was aborted')
+					}
+
+					batchCount++
+					const batchChunks = contentChunks.slice(i, Math.min(i + batchSize, contentChunks.length))
+					const embeddedBatch: InsertVector[] = []
+
+					const tasks = batchChunks.map((chunk) =>
+						limit(async () => {
+							if (abortController.signal.aborted) {
+								throw new Error('Operation was aborted')
+							}
+							try {
+								await backOff(
+									async () => {
+										// 在嵌入之前处理 markdown
+										const cleanContent = removeMarkdown(chunk.content).replace(/\0/g, '')
+										// 跳过清理后为空的内容
+										if (!cleanContent || cleanContent.trim().length === 0) {
+											return
+										}
+
+										const embedding = await embeddingModel.getEmbedding(cleanContent)
+										const embeddedChunk = {
+											path: chunk.path,
+											mtime: chunk.mtime,
+											content: cleanContent, // 使用清理后的内容
+											embedding,
+											metadata: chunk.metadata,
+										}
+										embeddedBatch.push(embeddedChunk)
+									},
+									{
+										numOfAttempts: 3,
+										startingDelay: 1000, // 增加延迟
+										timeMultiple: 2.0,
+										jitter: 'full',
+									},
+								)
+							} catch (error) {
+								console.error('Error in embedding task:', error)
+								// 不要立即中止，继续处理其他任务
+							}
+						}),
+					)
+
+					await Promise.all(tasks)
+
+					// 使用事务批量插入
+					if (embeddedBatch.length > 0) {
+						await this.insertVectorsWithTransaction(embeddedBatch, embeddingModel)
+						// 清理批次数据
+						embeddedBatch.length = 0
+					}
+
+					embeddingProgress.completed += batchChunks.length
+					updateProgress?.({
+						completedChunks: embeddingProgress.completed,
+						totalChunks: contentChunks.length,
+						totalFiles: filesToIndex.length,
+					})
+
+					// 定期内存清理和延迟
+					await this.memoryCleanupWithDelay(batchCount)
 				}
 			}
 		} catch (error) {
@@ -313,6 +686,7 @@ export class VectorManager {
 	async UpdateFileVectorIndex(
 		embeddingModel: EmbeddingModel,
 		chunkSize: number,
+		batchSize: number,
 		file: TFile
 	) {
 		try {
@@ -323,12 +697,24 @@ export class VectorManager {
 			)
 
 			// Embed the files
-			const textSplitter = RecursiveCharacterTextSplitter.fromLanguage(
-				'markdown',
-				{
-					chunkSize,
-				},
-			)
+			const overlap = Math.floor(chunkSize * 0.15)
+			const textSplitter = new RecursiveCharacterTextSplitter({
+				chunkSize: chunkSize,
+				chunkOverlap: overlap,
+				separators: [
+					"\n\n",
+					"\n",
+					".",
+					",",
+					" ",
+					"\u200b",  // Zero-width space
+					"\uff0c",  // Fullwidth comma
+					"\u3001",  // Ideographic comma
+					"\uff0e",  // Fullwidth full stop
+					"\u3002",  // Ideographic full stop
+					"",
+				],
+			});
 			let fileContent = await this.app.vault.cachedRead(file)
 			// 清理null字节，防止PostgreSQL UTF8编码错误
 			fileContent = fileContent.replace(/\0/g, '')
@@ -336,48 +722,62 @@ export class VectorManager {
 				fileContent,
 			])
 
-			const contentChunks: InsertVector[] = fileDocuments.map((chunk): InsertVector => {
-				return {
-					path: file.path,
-					mtime: file.stat.mtime,
-					content: chunk.pageContent.replace(/\0/g, ''), // 再次清理，确保安全
-					embedding: [],
-					metadata: {
-						startLine: Number(chunk.metadata.loc.lines.from),
-						endLine: Number(chunk.metadata.loc.lines.to),
-					},
-				}
-			})
+			const contentChunks: InsertVector[] = fileDocuments
+				.map((chunk): InsertVector | null => {
+					// 保存原始内容，不在此处调用 removeMarkdown
+					const rawContent = String(chunk.pageContent || '').replace(/\0/g, '')
+					if (!rawContent || rawContent.trim().length === 0) {
+						return null
+					}
+					return {
+						path: file.path,
+						mtime: file.stat.mtime,
+						content: rawContent, // 保存原始内容
+						embedding: [],
+						metadata: {
+							startLine: Number(chunk.metadata.loc.lines.from),
+							endLine: Number(chunk.metadata.loc.lines.to),
+						},
+					}
+				})
+				.filter((chunk): chunk is InsertVector => chunk !== null)
 
-			// 减少批量大小以降低内存压力
-			const insertBatchSize = 16 // 从64降低到16
 			let batchCount = 0
-			
+
 			try {
 				if (embeddingModel.supportsBatch) {
 					// 支持批量处理的提供商：使用流式处理逻辑
-					const embeddingBatchSize = 16 // 从64降低到16
-					
-					for (let i = 0; i < contentChunks.length; i += embeddingBatchSize) {
+					for (let i = 0; i < contentChunks.length; i += batchSize) {
 						batchCount++
-						console.log(`Embedding batch ${batchCount} of ${Math.ceil(contentChunks.length / embeddingBatchSize)}`)
-						const batchChunks = contentChunks.slice(i, Math.min(i + embeddingBatchSize, contentChunks.length))
-						const batchTexts = batchChunks.map(chunk => chunk.content)
-						
+						console.log(`Embedding batch ${batchCount} of ${Math.ceil(contentChunks.length / batchSize)}`)
+						const batchChunks = contentChunks.slice(i, Math.min(i + batchSize, contentChunks.length))
+
 						const embeddedBatch: InsertVector[] = []
-						
+
 						await backOff(
 							async () => {
+								// 在嵌入之前处理 markdown，只处理一次
+								const cleanedBatchData = batchChunks.map(chunk => {
+									const cleanContent = removeMarkdown(chunk.content).replace(/\0/g, '')
+									return { chunk, cleanContent }
+								}).filter(({ cleanContent }) => cleanContent && cleanContent.trim().length > 0)
+
+								if (cleanedBatchData.length === 0) {
+									return
+								}
+
+								const batchTexts = cleanedBatchData.map(({ cleanContent }) => cleanContent)
 								const batchEmbeddings = await embeddingModel.getBatchEmbeddings(batchTexts)
-								
+
 								// 合并embedding结果到chunk数据
-								for (let j = 0; j < batchChunks.length; j++) {
+								for (let j = 0; j < cleanedBatchData.length; j++) {
+									const { chunk, cleanContent } = cleanedBatchData[j]
 									const embeddedChunk: InsertVector = {
-										path: batchChunks[j].path,
-										mtime: batchChunks[j].mtime,
-										content: batchChunks[j].content,
+										path: chunk.path,
+										mtime: chunk.mtime,
+										content: cleanContent, // 使用已经清理过的内容
 										embedding: batchEmbeddings[j],
-										metadata: batchChunks[j].metadata,
+										metadata: chunk.metadata,
 									}
 									embeddedBatch.push(embeddedChunk)
 								}
@@ -404,17 +804,17 @@ export class VectorManager {
 					// 不支持批量处理的提供商：使用流式处理逻辑
 					const limit = pLimit(10) // 从50降低到10
 					const abortController = new AbortController()
-					
+
 					// 流式处理：分批处理并立即插入
-					for (let i = 0; i < contentChunks.length; i += insertBatchSize) {
+					for (let i = 0; i < contentChunks.length; i += batchSize) {
 						if (abortController.signal.aborted) {
 							throw new Error('Operation was aborted')
 						}
-						
+
 						batchCount++
-						const batchChunks = contentChunks.slice(i, Math.min(i + insertBatchSize, contentChunks.length))
+						const batchChunks = contentChunks.slice(i, Math.min(i + batchSize, contentChunks.length))
 						const embeddedBatch: InsertVector[] = []
-						
+
 						const tasks = batchChunks.map((chunk) =>
 							limit(async () => {
 								if (abortController.signal.aborted) {
@@ -423,11 +823,18 @@ export class VectorManager {
 								try {
 									await backOff(
 										async () => {
-											const embedding = await embeddingModel.getEmbedding(chunk.content)
+											// 在嵌入之前处理 markdown
+											const cleanContent = removeMarkdown(chunk.content).replace(/\0/g, '')
+											// 跳过清理后为空的内容
+											if (!cleanContent || cleanContent.trim().length === 0) {
+												return
+											}
+
+											const embedding = await embeddingModel.getEmbedding(cleanContent)
 											const embeddedChunk = {
 												path: chunk.path,
 												mtime: chunk.mtime,
-												content: chunk.content,
+												content: cleanContent, // 使用清理后的内容
 												embedding,
 												metadata: chunk.metadata,
 											}
@@ -446,9 +853,9 @@ export class VectorManager {
 								}
 							}),
 						)
-						
+
 						await Promise.all(tasks)
-						
+
 						// 立即插入当前批次
 						if (embeddedBatch.length > 0) {
 							await this.repository.insertVectors(embeddedBatch, embeddingModel)
@@ -502,8 +909,9 @@ export class VectorManager {
 		excludePatterns: string[]
 		includePatterns: string[]
 		reindexAll?: boolean
-		}): Promise<TFile[]> {
+	}): Promise<TFile[]> {
 		let filesToIndex = this.app.vault.getMarkdownFiles()
+		console.log("get all vault files: ", filesToIndex.length)
 
 		filesToIndex = filesToIndex.filter((file) => {
 			return !excludePatterns.some((pattern) => minimatch(file.path, pattern))
@@ -518,39 +926,161 @@ export class VectorManager {
 		if (reindexAll) {
 			return filesToIndex
 		}
-		// Check for updated or new files
-		filesToIndex = await Promise.all(
-			filesToIndex.map(async (file) => {
-				try {
-					const fileChunks = await this.repository.getVectorsByFilePath(
-						file.path,
-						embeddingModel,
-					)
-					if (fileChunks.length === 0) {
-						// File is not indexed, so we need to index it
-						let fileContent = await this.app.vault.cachedRead(file)
-						// 清理null字节，防止PostgreSQL UTF8编码错误
-						fileContent = fileContent.replace(/\0/g, '')
-						if (fileContent.length === 0) {
-							// Ignore empty files
-							return null
-						}
-						return file
-					}
-					const outOfDate = file.stat.mtime > fileChunks[0].mtime
-					if (outOfDate) {
-						// File has changed, so we need to re-index it
-						console.log("File has changed, so we need to re-index it", file.path)
-						return file
-					}
-					return null
-				} catch (error) {
-					console.warn(`跳过文件 ${file.path}:`, error.message)
-					return null
-				}
-			}),
-		).then((files) => files.filter(Boolean))
 
-		return filesToIndex
+		// 优化流程：使用数据库最大mtime来过滤需要更新的文件
+		try {
+			const maxMtime = await this.repository.getMaxMtime(embeddingModel)
+			console.log("Database max mtime:", maxMtime)
+
+			if (maxMtime === null) {
+				// 数据库中没有任何向量，需要索引所有文件
+				return filesToIndex
+			}
+
+			// 筛选出在数据库最后更新时间之后修改的文件
+			return filesToIndex.filter((file) => {
+				return file.stat.mtime > maxMtime
+			})
+		} catch (error) {
+			console.error("Error getting max mtime from database:", error)
+			return []
+		}
+	}
+
+	private async getFilesToIndexInWorkspace({
+		embeddingModel,
+		workspace,
+		excludePatterns,
+		includePatterns,
+		reindexAll,
+	}: {
+		embeddingModel: EmbeddingModel
+		workspace: Workspace
+		excludePatterns: string[]
+		includePatterns: string[]
+		reindexAll?: boolean
+	}): Promise<TFile[]> {
+		// 获取工作区中的所有文件
+		const workspaceFiles = new Set<string>()
+
+		if (workspace) {
+			// 处理工作区中的文件夹和标签
+			for (const item of workspace.content) {
+				if (item.type === 'folder') {
+					const folderPath = item.content
+					
+					// 获取文件夹下的所有文件
+					const files = this.app.vault.getMarkdownFiles().filter(file => 
+						file.path.startsWith(folderPath === '/' ? '' : folderPath + '/')
+					)
+					
+					// 添加所有文件路径
+					files.forEach(file => {
+						workspaceFiles.add(file.path)
+					})
+
+				} else if (item.type === 'tag') {
+					// 获取标签对应的所有文件
+					const tagFiles = getFilesWithTag(item.content, this.app)
+					
+					tagFiles.forEach(filePath => {
+						workspaceFiles.add(filePath)
+					})
+				}
+			}
+		}
+
+		// 将路径转换为 TFile 对象
+		let filesToIndex = Array.from(workspaceFiles)
+			.map(path => this.app.vault.getFileByPath(path))
+			.filter((file): file is TFile => file !== null && file instanceof TFile)
+
+		console.log("get workspace files: ", filesToIndex.length)
+
+		// 应用排除和包含模式
+		filesToIndex = filesToIndex.filter((file) => {
+			return !excludePatterns.some((pattern) => minimatch(file.path, pattern))
+		})
+
+		if (includePatterns.length > 0) {
+			filesToIndex = filesToIndex.filter((file) => {
+				return includePatterns.some((pattern) => minimatch(file.path, pattern))
+			})
+		}
+
+		if (reindexAll) {
+			return filesToIndex
+		}
+
+		// 优化流程：使用数据库最大mtime来过滤需要更新的文件
+		try {
+			const maxMtime = await this.repository.getMaxMtime(embeddingModel)
+			console.log("Database max mtime:", maxMtime)
+
+			if (maxMtime === null) {
+				// 数据库中没有任何向量，需要索引所有文件
+				return filesToIndex
+			}
+
+			// 筛选出在数据库最后更新时间之后修改的文件
+			return filesToIndex.filter((file) => {
+				return file.stat.mtime > maxMtime
+			})
+		} catch (error) {
+			console.error("Error getting max mtime from database:", error)
+			return []
+		}
+	}
+
+	// 增强的内存清理方法，增加延迟
+	private async memoryCleanupWithDelay(batchCount: number) {
+		// 每5批次强制垃圾回收和延迟
+		if (batchCount % 5 === 0) {
+			this.forceGarbageCollection()
+			// 增加延迟让系统有时间处理
+			await new Promise(resolve => setTimeout(resolve, 500))
+		}
+	}
+
+	// 使用事务插入向量的方法
+	private async insertVectorsWithTransaction(
+		data: InsertVector[],
+		embeddingModel: EmbeddingModel,
+	): Promise<void> {
+		const db = this.dbManager.getPgClient()
+		if (!db) {
+			throw new Error('Database not initialized')
+		}
+
+		const tableName = this.getTableName(embeddingModel)
+
+		// 使用 .exec 方法进行批量插入，性能更好
+		const insertStatements = data.map((vector) => {
+			// 转义字符串值以防止SQL注入
+			const escapedPath = vector.path.replace(/'/g, "''")
+			const escapedContent = vector.content.replace(/\0/g, '').replace(/'/g, "''")
+			const embeddingVector = `[${vector.embedding.join(',')}]`
+			const escapedMetadata = JSON.stringify(vector.metadata).replace(/'/g, "''")
+			
+			return `INSERT INTO "${tableName}" (path, mtime, content, embedding, metadata) VALUES ('${escapedPath}', ${vector.mtime}, '${escapedContent}', '${embeddingVector}', '${escapedMetadata}');`
+		}).join('\n')
+
+		// 使用事务包装批量插入
+		const sql = `
+			BEGIN;
+			${insertStatements}
+			COMMIT;
+		`
+
+		await db.exec(sql)
+	}
+
+	// 获取表名的辅助方法
+	private getTableName(embeddingModel: EmbeddingModel): string {
+		const tableDefinition = vectorTables[embeddingModel.dimension]
+		if (!tableDefinition) {
+			throw new Error(`No table definition found for model: ${embeddingModel.id}`)
+		}
+		return tableDefinition.name
 	}
 }

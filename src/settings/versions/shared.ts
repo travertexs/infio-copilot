@@ -1,12 +1,12 @@
 import { z } from "zod";
 
-export const SETTINGS_SCHEMA_VERSION = 0.4;
+export const SETTINGS_SCHEMA_VERSION = 0.5;
 
 export const MIN_DELAY = 0;
 export const MAX_DELAY = 2000;
 export const MIN_MAX_CHAR_LIMIT = 100;
 export const MAX_MAX_CHAR_LIMIT = 10000;
-export const MIN_MAX_TOKENS = 128;
+export const MIN_MAX_TOKENS = 4096;
 export const MAX_MAX_TOKENS = 8192;
 export const MIN_TEMPERATURE = 0.0;
 export const MAX_TEMPERATURE = 1.0;

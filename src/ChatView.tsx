@@ -8,12 +8,14 @@ import { CHAT_VIEW_TYPE } from './constants'
 import { AppProvider } from './contexts/AppContext'
 import { DarkModeProvider } from './contexts/DarkModeContext'
 import { DatabaseProvider } from './contexts/DatabaseContext'
+import { DataviewProvider } from './contexts/DataviewContext'
 import { DialogProvider } from './contexts/DialogContext'
 import { DiffStrategyProvider } from './contexts/DiffStrategyContext'
 import { LLMProvider } from './contexts/LLMContext'
 import { McpHubProvider } from './contexts/McpHubContext'
 import { RAGProvider } from './contexts/RAGContext'
 import { SettingsProvider } from './contexts/SettingsContext'
+import { TransProvider } from './contexts/TransContext'
 import InfioPlugin from './main'
 import { MentionableBlockData } from './types/mentionable'
 import { InfioSettings } from './types/settings'
@@ -57,8 +59,15 @@ export class ChatView extends ItemView {
 	}
 
 	async render() {
+		// 确保容器元素存在
+		const containerElement = this.containerEl.children[1]
+		if (!containerElement || !(containerElement instanceof HTMLElement)) {
+			console.error('ChatView: Container element not found or invalid')
+			return
+		}
+
 		if (!this.root) {
-			this.root = createRoot(this.containerEl.children[1])
+			this.root = createRoot(containerElement)
 		}
 
 		const queryClient = new QueryClient({
@@ -88,17 +97,21 @@ export class ChatView extends ItemView {
 							>
 								<DiffStrategyProvider diffStrategy={this.plugin.diffStrategy}>
 									<RAGProvider getRAGEngine={() => this.plugin.getRAGEngine()}>
-										<McpHubProvider getMcpHub={() => this.plugin.getMcpHub()}>
-											<QueryClientProvider client={queryClient}>
-												<React.StrictMode>
-													<DialogProvider
-														container={this.containerEl.children[1] as HTMLElement}
-													>
-														<Chat ref={this.chatRef} {...this.initialChatProps} />
-													</DialogProvider>
-												</React.StrictMode>
-											</QueryClientProvider>
-										</McpHubProvider>
+										<TransProvider getTransEngine={() => this.plugin.getTransEngine()}>
+											<DataviewProvider dataviewManager={this.plugin.dataviewManager}>
+											<McpHubProvider getMcpHub={() => this.plugin.getMcpHub()}>
+												<QueryClientProvider client={queryClient}>
+													<React.StrictMode>
+														<DialogProvider
+															container={containerElement}
+														>
+															<Chat ref={this.chatRef} {...this.initialChatProps} />
+														</DialogProvider>
+													</React.StrictMode>
+												</QueryClientProvider>
+											</McpHubProvider>
+										</DataviewProvider>
+										</TransProvider>
 									</RAGProvider>
 								</DiffStrategyProvider>
 							</DatabaseProvider>

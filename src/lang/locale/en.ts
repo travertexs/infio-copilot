@@ -6,6 +6,12 @@ export default {
 			subtitle: "Explore different modes to enhance your productivity"
 		},
 		navigation: {
+			history: "Chat History",
+			historyDesc: "View and manage your conversation history",
+			insights: "AI Insights",
+			insightsDesc: "View AI-generated insights and analysis",
+			search: "Semantic Search",
+			searchDesc: "Use RAG for semantic search within your note vault",
 			commands: "Commands",
 			commandsDesc: "Create and manage custom commands for quick actions",
 			customMode: "Custom Mode",
@@ -47,7 +53,29 @@ export default {
 			save: "Save",
 			cancel: "Cancel",
 			yesterday: "Yesterday",
-			daysAgo: "days ago"
+			daysAgo: "days ago",
+			// New keys for ChatHistoryView
+			cleanup: "Cleanup",
+			cleanupTitle: "Cleanup History Versions",
+			cleanupConfirm: "This operation will permanently delete all historical versions of conversations, keeping only the latest version. This helps clean up data, but the operation is irreversible. Are you sure you want to continue?",
+			cleanupSuccess: "Successfully cleaned up {count} outdated conversation files.",
+			cleanupNone: "No conversation files need to be cleaned up.",
+			cleanupFailed: "Cleanup failed, please check the developer console for more information.",
+			multiSelect: "Multi-select",
+			exitSelection: "Exit selection mode",
+			enterSelection: "Enter selection mode",
+			selectionMode: "Selection mode - {count} conversations selected",
+			selectAll: "Select all",
+			unselectAll: "Unselect all",
+			batchDelete: "Batch delete",
+			batchDeleteConfirm: "Are you sure you want to delete the selected {count} conversations? This operation is irreversible.",
+			batchDeleteSuccess: "Successfully deleted {count} conversations",
+			batchDeleteFailed: "{count} conversations failed to delete",
+			selectFirst: "Please select conversations to delete first",
+			currentWorkspace: "Current workspace",
+			showAllChats: "Show all conversations",
+			showWorkspaceChats: "Show only current workspace conversations",
+			workspaceLabel: "Workspace: {workspace}"
 		},
 		shortcutInfo: {
 			editInline: "Edit inline",
@@ -102,6 +130,7 @@ export default {
 			applying: "Applying...",
 			apply: "Apply",
 			reasoning: "Reasoning",
+			plan: "Plan",
 			readFile: "Read file: {path}",
 			listFiles: "List files: {path}",
 			fetchUrlsContent: "Fetch URLs Content",
@@ -119,6 +148,7 @@ export default {
 			viewDetails: "View details"
 		},
 		input: {
+			search: "Search",
 			submit: "Submit",
 			collectedModels: "Collected Models",
 			loading: "Loading...",
@@ -238,6 +268,8 @@ export default {
 			autocompleteModelDescription: 'Model used for code and text autocompletion, providing intelligent writing suggestions',
 			embeddingModel: 'Embedding model:',
 			embeddingModelDescription: 'Model used for document vectorization and semantic search, supporting RAG functionality',
+			insightModel: 'Insight model:',
+			insightModelDescription: 'Model used for generating intelligent insights and analysis, providing deep content understanding',
 		},
 		
 		// Model Provider Settings
@@ -248,6 +280,7 @@ export default {
 			oneClickConfig: 'One-Click Config',
 			oneClickConfigTooltip: 'Automatically configure models to recommended models from providers with API keys set',
 			chatModelConfigured: 'Chat model configured automatically: {provider}/{model}',
+			insightModelConfigured: 'Insight model configured automatically: {provider}/{model}',
 			autocompleteModelConfigured: 'Autocomplete model configured automatically: {provider}/{model}',
 			embeddingModelConfigured: 'Embedding model configured automatically: {provider}/{model}',
 			provider: 'Provider',
@@ -256,6 +289,11 @@ export default {
 			searchOrEnterModelName: 'Search or enter model name...',
 			enterCustomModelName: 'Enter custom model name',
 			custom: 'Custom: ',
+			localProviderDescription: 'Local embedding models run on your device using WASM technology, providing privacy and offline capability.',
+			localProviderFeature0: 'Currently only supports embedding models',
+			localProviderFeature1: 'Complete privacy - data never leaves your device',
+			localProviderFeature2: 'No API costs - runs entirely locally',
+			localProviderFeature3: 'Offline capability - works without internet connection',
 			testConnection: {
 				testApiConnection: 'Test API Connection',
 				testingConnection: 'Testing connection...',
@@ -363,6 +401,10 @@ export default {
 		// RAG Section
 		RAG: {
 			title: 'RAG(advanced)',
+			filesystem: 'Filesystem',
+			filesystemDescription: 'Choose the filesystem backend for storing vector embeddings. IDB uses IndexedDB (better compatibility), OPFS uses Origin Private File System (better performance).',
+			idb: 'IndexedDB',
+			opfs: 'OPFS',
 			includePatterns: 'Include patterns',
 			includePatternsDescription: 'If any patterns are specified, ONLY files matching at least one pattern will be included in indexing. One pattern per line. Uses glob patterns (e.g., "notes/*", "*.md"). Leave empty to include all files not excluded by exclude patterns. After changing this, use the command "Rebuild entire vault index" to apply changes.',
 			testPatterns: 'Test patterns',
@@ -370,6 +412,8 @@ export default {
 			excludePatternsDescription: 'Files matching ANY of these patterns will be excluded from indexing. One pattern per line. Uses glob patterns (e.g., "private/*", "*.tmp"). Leave empty to exclude nothing. After changing this, use the command "Rebuild entire vault index" to apply changes.',
 			chunkSize: 'Chunk size',
 			chunkSizeDescription: 'Set the chunk size for text splitting. After changing this, please re-index the vault using the "Rebuild entire vault index" command.',
+			batchSize: 'Batch size',
+			batchSizeDescription: 'Set the batch size for embedding. A smaller value may reduce memory usage. After changing this, please re-index the vault using the "Rebuild entire vault index" command.',
 			thresholdTokens: 'Threshold tokens',
 			thresholdTokensDescription: 'Maximum number of tokens before switching to RAG. If the total tokens from mentioned files exceed this, RAG will be used instead of including all file contents.',
 			minSimilarity: 'Minimum similarity',
@@ -503,5 +547,212 @@ export default {
 		parameters: "Parameters",
 		toolNoDescription: "No description",
 		useMcpToolFrom: "Use MCP tool from",
+	},
+	semanticSearch: {
+		title: "Semantic Index",
+		embeddingModel: "Embedding model:",
+		vectorBlocks: "vector blocks",
+		files: "files",
+		initializeIndex: "Initialize index",
+		updateIndex: "Update index",
+		initializing: "Initializing...",
+		initializingWorkspace: "Initializing workspace RAG vector index",
+		initializingDescription: "Building vector index for files in the current workspace to improve search accuracy",
+		buildingVectorIndex: "Building vector index",
+		blocks: "blocks",
+		totalFiles: "Total {count} files",
+		initializationComplete: "Workspace RAG vector index initialization complete: {workspaceName}",
+		searchPlaceholder: "Semantic search (press Enter to search)...",
+		searching: "Searching...",
+		noResults: "No relevant results found",
+		imagePlaceholder: "[Image]",
+		// Search mode
+		searchMode: {
+			all: "All",
+			allDescription: "Search both original notes and AI insights",
+			notes: "Original Notes",
+			notesDescription: "Search original note content",
+			insights: "AI Insights",
+			insightsDescription: "Search AI insight content"
+		},
+		// Statistics
+		stats: {
+			filesAndBlocks: "{files} files, {blocks} blocks",
+			filesAndInsights: "{files} files, {insights} insights",
+			filesBlocksAndInsights: "{files} files, {blocks} blocks, {insights} insights"
+		},
+		// Confirmation dialogs
+		deleteConfirm: {
+			title: "Clear workspace index",
+			message: "This will clear all vector index data for the current workspace.",
+			warning: "This action cannot be undone. After clearing, you need to reinitialize the index to perform semantic search.",
+			workspaceLabel: "Workspace:",
+			entireVault: "Entire Vault",
+			cancel: "Cancel",
+			confirm: "Confirm Clear"
+		},
+		initConfirm: {
+			initTitle: "Initialize workspace index",
+			updateTitle: "Update workspace index",
+			initMessage: "This will build vector index for all files in the current workspace, which will improve semantic search accuracy.",
+			updateMessage: "This will update the vector index for the current workspace, reprocessing all files to ensure the index is up-to-date.",
+			embeddingModelLabel: "Embedding model:",
+			workspaceLabel: "Workspace:",
+			entireVault: "Entire Vault",
+			warning: "This operation may take several minutes, depending on the number and size of files.",
+			cancel: "Cancel",
+			startInit: "Start Initialize",
+			startUpdate: "Start Update"
+		}
+	},
+	insights: {
+		title: "AI Insights",
+		initializeInsights: "Initialize Insights",
+		updateInsights: "Update Insights",
+		clearInsights: "Clear Insights",
+		refresh: "Refresh",
+		initializing: "Initializing...",
+		deleting: "Deleting...",
+		loading: "Loading...",
+		initializingWorkspace: "Initializing workspace insights...",
+		initializingDescription: "This may take a few minutes, please be patient",
+		stage: {
+			preparing: "Preparing to initialize workspace insights",
+			completing: "Completing initialization",
+			savingResults: "Saving results"
+		},
+		deleteConfirm: {
+			title: "Confirm Delete",
+			message: "Are you sure you want to delete all insights for the current workspace?",
+			warning: "⚠️ This action cannot be undone and will delete all generated transformation and insight data.",
+			scopeLabel: "Affected scope:",
+			cancel: "Cancel",
+			confirm: "Confirm Delete"
+		},
+		initConfirm: {
+			initTitle: "Confirm Initialize Insights",
+			updateTitle: "Confirm Update Insights",
+			initMessage: "Are you sure you want to initialize insights for the current workspace? This will generate AI summaries and analysis.",
+			updateMessage: "Are you sure you want to update insights for the current workspace? This will generate AI summaries and analysis for modified or new files.",
+			modelLabel: "Using model:",
+			workspaceLabel: "Target workspace:",
+			defaultModel: "Default model",
+			initWarning: "⚠️ This process may take a long time and will incur API costs.",
+			updateWarning: "⚠️ This process may take some time and will incur API costs. Only modified or new files will be processed.",
+			cancel: "Cancel",
+			initConfirm: "Confirm Initialize",
+			updateConfirm: "Confirm Update"
+		},
+		stats: {
+			itemsAndInsights: "{items} items, {insights} insights",
+			workspace: "{count} workspace",
+			folder: "{count} folder",
+			file: "{count} file",
+			scopeLabel: "Scope:",
+			insightCount: "insights",
+			workspaceCount: "workspaces",
+			folderCount: "folders",
+			fileCount: "files",
+			insightModelLabel: "Insight Model:"
+		},
+		types: {
+			denseSummary: "📋 Dense Summary",
+			simpleSummary: "📄 Simple Summary",
+			keyInsights: "💡 Key Insights",
+			analyzePaper: "🔬 Paper Analysis",
+			tableOfContents: "📑 Table of Contents",
+			reflections: "🤔 Reflections"
+		},
+		fileGroup: {
+			workspacePrefix: "🌐 Workspace:",
+			folderPrefix: "📁"
+		},
+		noResults: {
+			title: "No insight data found in the current scope",
+			hint: "Please try running transformation tools on documents to generate AI insights"
+		},
+		tooltips: {
+			initialize: "Initialize insights for the current workspace, will recursively process all files and generate summaries",
+			update: "Update insights for the current workspace, generate summaries for modified or new files",
+			clear: "Delete all transformations and insights for the current workspace"
+		},
+		success: {
+			workspaceInitialized: 'Workspace "{name}" insights initialization successful',
+			workspaceDeleted: 'Successfully deleted {count} transformations for workspace "{name}"',
+			insightDeleted: 'Insight ID {id} successfully deleted'
+		},
+		error: {
+			initializationFailed: "Workspace insight initialization failed:",
+			deletionFailed: "Failed to delete workspace insights:",
+			singleDeletionFailed: "Failed to delete insight:",
+			fileNotFound: "File not found in vault:",
+			folderNotFound: "Folder does not exist:"
+		},
+		progress: {
+			current: "Processing: {item}",
+			stage: "Stage:",
+			progressLabel: "Progress:",
+			currentLabel: "Current:",
+			insightCountLabel: "insights"
+		}
+	},
+	workspace: {
+		title: "Workspace Management",
+		shortTitle: "Workspace",
+		description: "Manage and switch between different workspaces (note vaults)",
+		entireVault: "Entire Vault",
+		createNew: "Create New Workspace",
+		recentWorkspaces: "Recent Workspaces",
+		loading: "Loading workspace list...",
+		noWorkspaces: "No workspaces available",
+		empty: "Empty workspace",
+		editTooltip: "Edit workspace",
+		deleteTooltip: "Delete workspace",
+		refreshTooltip: "Refresh workspace list",
+		newWorkspace: "New Workspace",
+		notices: {
+			alreadyInWorkspace: "Already in this workspace",
+			switchedTo: "Switched to workspace: {name}",
+			workspaceContent: "Workspace content: {content}",
+			cannotDeleteCurrent: "Cannot delete current workspace",
+			cannotDeleteDefault: "Cannot delete default workspace",
+			deleted: "Deleted workspace: {name}",
+			deleteFailed: "Failed to delete workspace",
+			created: "Created workspace: {name}",
+			createFailed: "Failed to create workspace",
+			updated: "Updated workspace: {name}",
+			updateFailed: "Failed to update workspace",
+			refreshFailed: "Failed to refresh workspace list",
+			switchFailed: "Failed to switch workspace"
+		},
+		deleteConfirm: 'Are you sure you want to delete workspace "{name}"? This action cannot be undone.',
+		current: "Current",
+		conversations: "conversations",
+		created: "Created",
+		updated: "Updated",
+		folders: "folders",
+		tags: "tags",
+		noContent: "No content",
+		editModal: {
+			editTitle: "Edit Workspace",
+			createTitle: "Create Workspace",
+			nameLabel: "Workspace Name",
+			namePlaceholder: "Enter workspace name",
+			newNamePlaceholder: "Enter new workspace name",
+			contentLabel: "Workspace Content",
+			noContent: "No content, please add folders or tags",
+			addPlaceholder: "Add folder or tag...",
+			folder: "Folder",
+			tag: "Tag",
+			tip: "Tip: Enter keywords to search existing folders and tags, entries starting with # will be recognized as tags",
+			cancel: "Cancel",
+			save: "Save",
+			create: "Create",
+			saving: "Saving...",
+			creating: "Creating...",
+			nameRequired: "Workspace name cannot be empty",
+			saveFailed: "Save failed, please try again",
+			defaultName: "Workspace {date}"
+		}
 	}
 }

@@ -5,7 +5,33 @@ import { parseInfioSettings } from './settings'
 
 describe('parseSmartCopilotSettings', () => {
 	it('should return default values for empty input', () => {
-		const result = parseInfioSettings({})
+		const result = parseInfioSettings({
+			autocompleteEnabled: true,
+			advancedMode: false,
+			apiProvider: 'openai',
+			triggers: DEFAULT_SETTINGS.triggers,
+			delay: 500,
+			modelOptions: {
+				temperature: 1,
+				top_p: 0.1,
+				frequency_penalty: 0.25,
+				presence_penalty: 0,
+				max_tokens: 4096,
+			},
+			systemMessage: DEFAULT_SETTINGS.systemMessage,
+			fewShotExamples: DEFAULT_SETTINGS.fewShotExamples,
+			userMessageTemplate: '{{prefix}}<mask/>{{suffix}}',
+			chainOfThoughRemovalRegex: '(.|\\n)*ANSWER:',
+			dontIncludeDataviews: true,
+			maxPrefixCharLimit: 4000,
+			maxSuffixCharLimit: 4000,
+			removeDuplicateMathBlockIndicator: true,
+			removeDuplicateCodeBlockIndicator: true,
+			ignoredFilePatterns: '**/secret/**\n',
+			ignoredTags: '',
+			cacheSuggestions: true,
+			debugMode: false,
+		})
 		expect(result).toEqual({
       // Version
 			version: SETTINGS_SCHEMA_VERSION,
@@ -34,18 +60,28 @@ describe('parseSmartCopilotSettings', () => {
 				apiKey: '',
 				baseUrl: '',
 				useCustomUrl: false,
+				models: [],
+			},
+			localproviderProvider: {
+				name: 'LocalProvider',
+				apiKey: '',
+				baseUrl: '',
+				useCustomUrl: false,
+				models: [],
 			},
 			anthropicProvider: {
 				name: 'Anthropic',
 				apiKey: '',
 				baseUrl: '',
 				useCustomUrl: false,
+				models: [],
 			},
       deepseekProvider: {
 				name: 'DeepSeek',
 				apiKey: '',
 				baseUrl: '',
 				useCustomUrl: false,
+				models: [],
 			},
       openaiProvider: {
 				name: 'OpenAI',
@@ -58,6 +94,7 @@ describe('parseSmartCopilotSettings', () => {
 				apiKey: '',
 				baseUrl: '',
 				useCustomUrl: false,
+				models: [],
 			},
       ollamaProvider: {
 				apiKey: 'ollama',
@@ -70,18 +107,21 @@ describe('parseSmartCopilotSettings', () => {
 				apiKey: '',
 				baseUrl: '',
 				useCustomUrl: false,
+				models: [],
 			},
 			grokProvider: {
 				name: 'Grok',
 				apiKey: '',
 				baseUrl: '',
 				useCustomUrl: false,
+				models: [],
 			},
 			openaicompatibleProvider: {
 				name: 'OpenAICompatible',
 				apiKey: '',
 				baseUrl: '',
 				useCustomUrl: true,
+				models: [],
 			},
       // MCP Servers
       mcpEnabled: false,
@@ -92,6 +132,9 @@ describe('parseSmartCopilotSettings', () => {
       // Chat Model
       chatModelProvider: 'Infio',
 			chatModelId: '',
+			// Insight Model
+			insightModelProvider: 'Infio',
+			insightModelId: '',
       // Apply Model
       applyModelProvider: 'Infio',
       applyModelId: '',
@@ -104,6 +147,8 @@ describe('parseSmartCopilotSettings', () => {
       experimentalDiffStrategy: false,
       // Multi Search Replace Diff Strategy
       multiSearchReplaceDiffStrategy: true,
+			// Workspace
+			workspace: '',
       // Mode
       mode: 'ask',
 			defaultMention: 'none',
@@ -221,11 +266,38 @@ describe('settings migration', () => {
 			embeddingModel: 'text-embedding-3-small',
 			systemPrompt: 'system prompt',
 			ragOptions: {
-				chunkSize: 1000,
+				filesystem: 'opfs',
+				batchSize: 32,
+				chunkSize: 500,
 				thresholdTokens: 8192,
 				minSimilarity: 0.0,
 				limit: 10,
 			},
+			autocompleteEnabled: true,
+			advancedMode: false,
+			apiProvider: 'openai',
+			triggers: DEFAULT_SETTINGS.triggers,
+			delay: 500,
+			modelOptions: {
+				temperature: 1,
+				top_p: 0.1,
+				frequency_penalty: 0.25,
+				presence_penalty: 0,
+				max_tokens: 4096,
+			},
+			systemMessage: DEFAULT_SETTINGS.systemMessage,
+			fewShotExamples: DEFAULT_SETTINGS.fewShotExamples,
+			userMessageTemplate: '{{prefix}}<mask/>{{suffix}}',
+			chainOfThoughRemovalRegex: '(.|\\n)*ANSWER:',
+			dontIncludeDataviews: true,
+			maxPrefixCharLimit: 4000,
+			maxSuffixCharLimit: 4000,
+			removeDuplicateMathBlockIndicator: true,
+			removeDuplicateCodeBlockIndicator: true,
+			ignoredFilePatterns: '**/secret/**\n',
+			ignoredTags: '',
+			cacheSuggestions: true,
+			debugMode: false,
 		}
 
 		const result = parseInfioSettings(oldSettings)
@@ -239,18 +311,21 @@ describe('settings migration', () => {
 				apiKey: '',
 				baseUrl: '',
 				useCustomUrl: false,
+				models: [],
 			},
       openrouterProvider: {
 				name: 'OpenRouter',
 				apiKey: '',
 				baseUrl: '',
 				useCustomUrl: false,
+				models: [],
 			},
 			siliconflowProvider: {
 				name: 'SiliconFlow',
 				apiKey: '',
 				baseUrl: '',
 				useCustomUrl: false,
+				models: [],
 			},
 			alibabaQwenProvider: {
 				name: 'AlibabaQwen',
@@ -315,6 +390,9 @@ describe('settings migration', () => {
       // Chat Model
       chatModelProvider: 'Infio',
       chatModelId: 'claude-3.5-sonnet-latest',
+			// Insight Model
+			insightModelProvider: 'Infio',
+			insightModelId: '',
       // Apply Model
       applyModelProvider: 'Infio',
 			applyModelId: 'gpt-4o-mini',
@@ -327,6 +405,8 @@ describe('settings migration', () => {
       experimentalDiffStrategy: false,
       // Multi Search Replace Diff Strategy
       multiSearchReplaceDiffStrategy: true,
+			// Workspace
+			workspace: '',
       // Mode
       mode: 'ask',
 			defaultMention: 'none',
@@ -429,5 +509,83 @@ describe('settings migration', () => {
         chainOfThoughRemovalRegex: '',
       },
 		})
+	})
+
+	it('should migrate max_tokens from old value to new minimum', () => {
+		// Test case: user has old max_tokens value (800) that needs to be migrated
+		const settingsWithOldMaxTokens = {
+			version: 0.4,
+			modelOptions: {
+				temperature: 1,
+				top_p: 0.1,
+				frequency_penalty: 0.25,
+				presence_penalty: 0,
+				max_tokens: 800, // Old value that's below new minimum
+			},
+			// Include other required fields for valid settings
+			autocompleteEnabled: true,
+			advancedMode: false,
+			apiProvider: 'openai',
+			triggers: DEFAULT_SETTINGS.triggers,
+			delay: 500,
+			systemMessage: DEFAULT_SETTINGS.systemMessage,
+			fewShotExamples: DEFAULT_SETTINGS.fewShotExamples,
+			userMessageTemplate: '{{prefix}}<mask/>{{suffix}}',
+			chainOfThoughRemovalRegex: '(.|\\n)*ANSWER:',
+			dontIncludeDataviews: true,
+			maxPrefixCharLimit: 4000,
+			maxSuffixCharLimit: 4000,
+			removeDuplicateMathBlockIndicator: true,
+			removeDuplicateCodeBlockIndicator: true,
+			ignoredFilePatterns: '**/secret/**\n',
+			ignoredTags: '',
+			cacheSuggestions: true,
+			debugMode: false,
+		}
+
+		const result = parseInfioSettings(settingsWithOldMaxTokens)
+		
+		// Should successfully parse and migrate max_tokens to 4096
+		expect(result.modelOptions.max_tokens).toBe(4096)
+		expect(result.version).toBe(0.5)
+	})
+
+	it('should not change max_tokens if it is already above minimum', () => {
+		// Test case: user has max_tokens already above minimum
+		const settingsWithValidMaxTokens = {
+			version: 0.4,
+			modelOptions: {
+				temperature: 1,
+				top_p: 0.1,
+				frequency_penalty: 0.25,
+				presence_penalty: 0,
+				max_tokens: 6000, // Already above minimum
+			},
+			// Include other required fields for valid settings
+			autocompleteEnabled: true,
+			advancedMode: false,
+			apiProvider: 'openai',
+			triggers: DEFAULT_SETTINGS.triggers,
+			delay: 500,
+			systemMessage: DEFAULT_SETTINGS.systemMessage,
+			fewShotExamples: DEFAULT_SETTINGS.fewShotExamples,
+			userMessageTemplate: '{{prefix}}<mask/>{{suffix}}',
+			chainOfThoughRemovalRegex: '(.|\\n)*ANSWER:',
+			dontIncludeDataviews: true,
+			maxPrefixCharLimit: 4000,
+			maxSuffixCharLimit: 4000,
+			removeDuplicateMathBlockIndicator: true,
+			removeDuplicateCodeBlockIndicator: true,
+			ignoredFilePatterns: '**/secret/**\n',
+			ignoredTags: '',
+			cacheSuggestions: true,
+			debugMode: false,
+		}
+
+		const result = parseInfioSettings(settingsWithValidMaxTokens)
+		
+		// Should keep the existing max_tokens value since it's already valid
+		expect(result.modelOptions.max_tokens).toBe(6000)
+		expect(result.version).toBe(0.5)
 	})
 })

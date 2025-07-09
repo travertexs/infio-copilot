@@ -33,6 +33,17 @@ export class VectorRepository {
     return result.rows.map((row: { path: string }) => row.path)
   }
 
+  async getMaxMtime(embeddingModel: EmbeddingModel): Promise<number | null> {
+    if (!this.db) {
+      throw new DatabaseNotInitializedException()
+    }
+    const tableName = this.getTableName(embeddingModel)
+    const result = await this.db.query<{ max_mtime: number | null }>(
+      `SELECT MAX(mtime) as max_mtime FROM "${tableName}"`
+    )
+    return result.rows[0]?.max_mtime || null
+  }
+
   async getVectorsByFilePath(
     filePath: string,
     embeddingModel: EmbeddingModel,
@@ -136,7 +147,7 @@ export class VectorRepository {
     const tableName = this.getTableName(embeddingModel)
 
     let scopeCondition = ''
-    const params: any[] = [`[${queryVector.join(',')}]`, options.minSimilarity, options.limit]
+    const params: unknown[] = [`[${queryVector.join(',')}]`, options.minSimilarity, options.limit]
     let paramIndex = 4
 
     if (options.scope) {
@@ -176,5 +187,95 @@ export class VectorRepository {
     type SearchResult = Omit<SelectVector, 'embedding'> & { similarity: number }
     const result = await this.db.query<SearchResult>(query, params)
     return result.rows
+  }
+
+  async getWorkspaceStatistics(
+    embeddingModel: EmbeddingModel,
+    scope?: {
+      files: string[]
+      folders: string[]
+    }
+  ): Promise<{
+    totalFiles: number
+    totalChunks: number
+  }> {
+    if (!this.db) {
+      throw new DatabaseNotInitializedException()
+    }
+    const tableName = this.getTableName(embeddingModel)
+
+    let scopeCondition = ''
+    const params: unknown[] = []
+    let paramIndex = 1
+
+    if (scope) {
+      const conditions: string[] = []
+
+      if (scope.files.length > 0) {
+        conditions.push(`path = ANY($${paramIndex})`)
+        params.push(scope.files)
+        paramIndex++
+      }
+
+      if (scope.folders.length > 0) {
+        const folderConditions = scope.folders.map((folder, idx) => {
+          params.push(`${folder}/%`)
+          return `path LIKE $${paramIndex + idx}`
+        })
+        conditions.push(`(${folderConditions.join(' OR ')})`)
+        paramIndex += scope.folders.length
+      }
+
+      if (conditions.length > 0) {
+        scopeCondition = `WHERE (${conditions.join(' OR ')})`
+      }
+    }
+
+    const query = `
+      SELECT 
+        COUNT(DISTINCT path) as total_files,
+        COUNT(*) as total_chunks
+      FROM "${tableName}"
+      ${scopeCondition}
+    `
+
+    const result = await this.db.query<{
+      total_files: number
+      total_chunks: number
+    }>(query, params)
+
+    const row = result.rows[0]
+    return {
+      totalFiles: Number(row?.total_files || 0),
+      totalChunks: Number(row?.total_chunks || 0)
+    }
+  }
+
+  async getVaultStatistics(embeddingModel: EmbeddingModel): Promise<{
+    totalFiles: number
+    totalChunks: number
+  }> {
+    if (!this.db) {
+      throw new DatabaseNotInitializedException()
+    }
+    const tableName = this.getTableName(embeddingModel)
+
+    const query = `
+      SELECT 
+        COUNT(DISTINCT path) as total_files,
+        COUNT(*) as total_chunks
+      FROM "${tableName}"
+    `
+
+    const result = await this.db.query<{
+      total_files: number
+      total_chunks: number
+    }>(query)
+
+    const row = result.rows[0]
+    return {
+      totalFiles: Number(row?.total_files || 0),
+      totalChunks: Number(row?.total_chunks || 0)
+    }
   }
 }

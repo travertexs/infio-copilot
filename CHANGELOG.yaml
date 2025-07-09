@@ -1,4 +1,44 @@
 releases:
+  - version: "0.7.3"
+    features:
+      - "add idb support"
+  - version: "0.7.2"
+    fixes:
+      - "fix workspace vector index error"
+      - "update insight and search view style"
+  - version: "0.7.1"
+    fixes:
+      - "fix settings migration"
+  - version: "0.7.0"
+    features:
+      - "add insight transformation"
+      - "add workspace"
+      - "add dataview support"
+      - "add local embedding model support"
+  - version: "0.6.18"
+    fixes:
+      - "fix mermaid block style, add copy btn"
+  - version: "0.6.17"
+    fixes:
+      - "fix mermaid block style"
+      - "fix chat view style"						
+  - version: "0.6.16"
+    fixes:
+      -  "fix chat view style"
+  - version: "0.6.15"
+    improvements:
+      -  "update chat view style"
+  - version: "0.6.14"
+    fixes:
+      - "fix search view user select text error"
+      - "fix model select error"
+  - version: "0.6.13"
+    features:
+      - "fix settings migration"
+      - "update settings migration"
+  - version: "0.6.12"
+    features:
+      - "fix settings migration"
   - version: "0.6.10"
     features:
       - "update chat history view"

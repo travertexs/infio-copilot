@@ -15,6 +15,7 @@ import {
 } from "./v1/v1";
 import {
   SETTINGS_SCHEMA_VERSION,
+	MIN_MAX_TOKENS,
   DeprecatedSettingsSchema,
 } from './shared';
 
@@ -93,8 +94,27 @@ const MIGRATIONS: Migration[] = [
 		toVersion: 0.4,
 		migrate: (data) => {
 			const newData = { ...data };
-			newData.version = SETTINGS_SCHEMA_VERSION;
+			newData.version = 0.4;
 			return newData;
+		},
+	},
+	{
+		fromVersion: 0.4,
+		toVersion: 0.5,
+		migrate: (data) => {
+			const newData = { ...data }
+			newData.version = 0.5
+			
+			// Handle max_tokens minimum value increase from 800 to 4096
+			if (newData.modelOptions && typeof newData.modelOptions === 'object') {
+				const modelOptions = newData.modelOptions as Record<string, any>
+				if (typeof modelOptions.max_tokens === 'number' && modelOptions.max_tokens < MIN_MAX_TOKENS) {
+					console.log(`Updating max_tokens from ${modelOptions.max_tokens} to ${MIN_MAX_TOKENS} due to minimum value change`)
+					modelOptions.max_tokens = MIN_MAX_TOKENS
+				}
+			}
+			
+			return newData
 		},
 	},
   // Provider settings migration

@@ -35,6 +35,7 @@ export interface EmbeddingModelInfo {
 // https://docs.anthropic.com/en/docs/about-claude/models
 export type AnthropicModelId = keyof typeof anthropicModels
 export const anthropicDefaultModelId: AnthropicModelId = "claude-sonnet-4-20250514"
+export const anthropicDefaultInsightModelId: AnthropicModelId = "claude-sonnet-4-20250514"
 export const anthropicDefaultAutoCompleteModelId: AnthropicModelId = "claude-3-5-haiku-20241022"
 export const anthropicDefaultEmbeddingModelId: AnthropicModelId = null // this is not supported embedding model
 export const anthropicModels = {
@@ -131,6 +132,7 @@ export const anthropicModels = {
 
 // Infio
 export const infioDefaultModelId = "gemini/gemini-2.5-pro-preview-06-05" // for chat
+export const infioDefaultInsightModelId = "deepseek/deepseek-v3" // for insight
 export const infioDefaultAutoCompleteModelId = "groq/llama-3.3-70b-versatile" // for auto complete
 export const infioDefaultEmbeddingModelId = "openai/text-embedding-3-small" // for embedding
 export const infioDefaultModelInfo: ModelInfo = {
@@ -214,6 +216,7 @@ export const infioEmbeddingModels = {
 // OpenRouter
 // https://openrouter.ai/models?order=newest&supported_parameters=tools
 export const openRouterDefaultModelId = "google/gemini-2.5-pro-preview" // for chat
+export const openRouterDefaultInsightModelId = "deepseek/deepseek-chat-v3-0324" // for insight
 export const openRouterDefaultAutoCompleteModelId = "google/gemini-2.5-flash-preview-05-20" // for auto complete
 export const openRouterDefaultEmbeddingModelId = null // this is not supported embedding model
 export const openRouterDefaultModelInfo: ModelInfo = {
@@ -268,6 +271,7 @@ async function fetchOpenRouterModels(): Promise<Record<string, ModelInfo>> {
 // https://ai.google.dev/gemini-api/docs/models/gemini
 export type GeminiModelId = keyof typeof geminiModels
 export const geminiDefaultModelId: GeminiModelId = "gemini-2.5-pro-preview-05-06"
+export const geminiDefaultInsightModelId: GeminiModelId = "gemini-2.5-flash-preview-05-20"
 export const geminiDefaultAutoCompleteModelId: GeminiModelId = "gemini-2.5-flash-preview-05-20"
 export const geminiDefaultEmbeddingModelId: keyof typeof geminiEmbeddingModels = "text-embedding-004"
 
@@ -497,6 +501,7 @@ export const geminiEmbeddingModels = {
 // https://openai.com/api/pricing/
 export type OpenAiNativeModelId = keyof typeof openAiNativeModels
 export const openAiNativeDefaultModelId: OpenAiNativeModelId = "gpt-4o"
+export const openAiNativeDefaultInsightModelId: OpenAiNativeModelId = "gpt-4o-mini"
 export const openAiNativeDefaultAutoCompleteModelId: OpenAiNativeModelId = "gpt-4o-mini"
 export const openAiNativeDefaultEmbeddingModelId: keyof typeof openAINativeEmbeddingModels = "text-embedding-3-small"
 
@@ -605,6 +610,7 @@ export const openAINativeEmbeddingModels = {
 // https://api-docs.deepseek.com/quick_start/pricing
 export type DeepSeekModelId = keyof typeof deepSeekModels
 export const deepSeekDefaultModelId: DeepSeekModelId = "deepseek-chat"
+export const deepSeekDefaultInsightModelId: DeepSeekModelId = "deepseek-chat"
 export const deepSeekDefaultAutoCompleteModelId: DeepSeekModelId = "deepseek-chat"
 export const deepSeekDefaultEmbeddingModelId = null // this is not supported embedding model
 
@@ -635,6 +641,7 @@ export const deepSeekModels = {
 // https://help.aliyun.com/zh/model-studio/getting-started/
 export type QwenModelId = keyof typeof qwenModels
 export const qwenDefaultModelId: QwenModelId = "qwen3-235b-a22b"
+export const qwenDefaultInsightModelId: QwenModelId = "qwen3-32b"
 export const qwenDefaultAutoCompleteModelId: QwenModelId = "qwen3-32b"
 export const qwenDefaultEmbeddingModelId: keyof typeof qwenEmbeddingModels = "text-embedding-v3"
 
@@ -903,6 +910,10 @@ export const qwenModels = {
 	},
 } as const satisfies Record<string, ModelInfo>
 export const qwenEmbeddingModels = {
+	"text-embedding-v4": {
+		dimensions: 1024,
+		description: "支持50+主流语种，包括中文、英语、西班牙语、法语、葡萄牙语、印尼语、日语、韩语、德语、俄罗斯语等。最大行数20，单行最大处理8,192 Token。支持可选维度：1,024（默认）、768或512。单价：0.0007元/千Token。免费额度：50万Token（有效期180天）。"
+	},
 	"text-embedding-v3": {
 		dimensions: 1024,
 		description: "支持50+主流语种，包括中文、英语、西班牙语、法语、葡萄牙语、印尼语、日语、韩语、德语、俄罗斯语等。最大行数20，单行最大处理8,192 Token。支持可选维度：1,024（默认）、768或512。单价：0.0007元/千Token。免费额度：50万Token（有效期180天）。"
@@ -933,6 +944,7 @@ export const qwenEmbeddingModels = {
 // https://docs.siliconflow.cn/
 export type SiliconFlowModelId = keyof typeof siliconFlowModels
 export const siliconFlowDefaultModelId: SiliconFlowModelId = "deepseek-ai/DeepSeek-V3"
+export const siliconFlowDefaultInsightModelId: SiliconFlowModelId = "deepseek-ai/DeepSeek-V3"
 export const siliconFlowDefaultAutoCompleteModelId: SiliconFlowModelId = "deepseek-ai/DeepSeek-V3"
 export const siliconFlowDefaultEmbeddingModelId: keyof typeof siliconFlowEmbeddingModels = "BAAI/bge-m3"
 
@@ -1416,6 +1428,7 @@ export const siliconFlowEmbeddingModels = {
 // https://console.groq.com/docs/overview
 export type GroqModelId = keyof typeof groqModels
 export const groqDefaultModelId: GroqModelId = "llama-3.3-70b-versatile"
+export const groqDefaultInsightModelId: GroqModelId = "llama-3.3-70b-versatile"
 export const groqDefaultAutoCompleteModelId: GroqModelId = "llama-3.3-70b-versatile"
 export const groqDefaultEmbeddingModelId = null // this is not supported embedding model
 
@@ -1577,6 +1590,7 @@ export const groqModels = {
 // https://docs.x.ai/docs/models
 export type GrokModelId = keyof typeof grokModels
 export const grokDefaultModelId: GrokModelId = "grok-3"
+export const grokDefaultInsightModelId: GrokModelId = "grok-3-mini"
 export const grokDefaultAutoCompleteModelId: GrokModelId = "grok-3-mini-fast"
 export const grokDefaultEmbeddingModelId = null // this is not supported embedding model
 
@@ -1631,6 +1645,34 @@ export const grokModels = {
 	}
 } as const satisfies Record<string, ModelInfo>
 
+// LocalProvider (本地嵌入模型)
+export const localProviderDefaultModelId = null // this is not supported for chat/autocomplete
+export const localProviderDefaultInsightModelId = null // this is not supported for insight
+export const localProviderDefaultAutoCompleteModelId = null // this is not supported for chat/autocomplete  
+export const localProviderDefaultEmbeddingModelId: keyof typeof localProviderEmbeddingModels = "TaylorAI/bge-micro-v2"
+
+export const localProviderEmbeddingModels = {
+	'TaylorAI/bge-micro-v2': { dimensions: 384, description: 'BGE-micro-v2 (本地，512令牌，384维)' },
+	'Xenova/all-MiniLM-L6-v2': { dimensions: 384, description: 'All-MiniLM-L6-v2 (推荐，轻量级)' },
+	'Xenova/bge-small-en-v1.5': { dimensions: 384, description: 'BGE-small-en-v1.5' },
+	'Xenova/bge-base-en-v1.5': { dimensions: 768, description: 'BGE-base-en-v1.5 (更高质量)' },
+	'Xenova/jina-embeddings-v2-base-zh': { dimensions: 768, description: 'Jina-v2-base-zh (中英双语)' },
+	'Xenova/jina-embeddings-v2-small-en': { dimensions: 512, description: 'Jina-v2-small-en' },
+	'Xenova/multilingual-e5-small': { dimensions: 384, description: 'E5-small (多语言)' },
+	'Xenova/multilingual-e5-base': { dimensions: 768, description: 'E5-base (多语言，更高质量)' },
+	'Xenova/gte-small': { dimensions: 384, description: 'GTE-small' },
+	'Xenova/e5-small-v2': { dimensions: 384, description: 'E5-small-v2' },
+	'Xenova/e5-base-v2': { dimensions: 768, description: 'E5-base-v2 (更高质量)' },
+	'Snowflake/snowflake-arctic-embed-xs': { dimensions: 384, description: 'Snowflake Arctic Embed XS (本地，512令牌，384维)' },
+	'Snowflake/snowflake-arctic-embed-s': { dimensions: 384, description: 'Snowflake Arctic Embed Small (本地，512令牌，384维)' },
+	'Snowflake/snowflake-arctic-embed-m': { dimensions: 768, description: 'Snowflake Arctic Embed Medium (本地，512令牌，768维)' },
+	'TaylorAI/gte-tiny': { dimensions: 384, description: 'GTE-tiny (本地，512令牌，384维)' },
+	'Mihaiii/Ivysaur': { dimensions: 384, description: 'Ivysaur (本地，512令牌，384维)' },
+	'andersonbcdefg/bge-small-4096': { dimensions: 384, description: 'BGE-small-4K (本地，4096令牌，384维)' },
+	'nomic-ai/nomic-embed-text-v1.5': { dimensions: 768, description: 'Nomic-embed-text-v1.5 (本地，2048令牌，768维)' },
+	'nomic-ai/nomic-embed-text-v1': { dimensions: 768, description: 'Nomic-embed-text (本地，2048令牌，768维)' }
+} as const satisfies Record<string, EmbeddingModelInfo>
+
 /// helper functions
 // get all providers, used for the provider dropdown
 export const GetAllProviders = (): ApiProvider[] => {
@@ -1647,6 +1689,7 @@ export const GetAllProviders = (): ApiProvider[] => {
 		ApiProvider.Groq,
 		ApiProvider.Ollama,
 		ApiProvider.OpenAICompatible,
+		ApiProvider.LocalProvider,
 	]
 }
 
@@ -1659,6 +1702,7 @@ export const GetEmbeddingProviders = (): ApiProvider[] => {
 		ApiProvider.SiliconFlow,
 		ApiProvider.OpenAICompatible,
 		ApiProvider.Ollama,
+		ApiProvider.LocalProvider,
 	]
 }
 
@@ -1691,6 +1735,8 @@ export const GetProviderModels = async (provider: ApiProvider, settings?: InfioS
 			return {}
 		case ApiProvider.OpenAICompatible:
 			return {}
+		case ApiProvider.LocalProvider:
+			return {} 
 		default:
 			return {}
 	}
@@ -1725,6 +1771,8 @@ export const GetProviderModelsWithSettings = async (provider: ApiProvider, setti
 			return {}
 		case ApiProvider.OpenAICompatible:
 			return {}
+		case ApiProvider.LocalProvider:
+			return {} // LocalProvider only supports embedding models
 		default:
 			return {}
 	}
@@ -1751,6 +1799,8 @@ export const GetEmbeddingProviderModels = (provider: ApiProvider): Record<string
 			return openAINativeEmbeddingModels;
 		case ApiProvider.AlibabaQwen:
 			return qwenEmbeddingModels;
+		case ApiProvider.LocalProvider:
+			return localProviderEmbeddingModels;
 		default:
 			return {}
 	}
@@ -1760,77 +1810,109 @@ export const GetEmbeddingProviderModelIds = (provider: ApiProvider): string[] =>
 	return Object.keys(GetEmbeddingProviderModels(provider))
 }
 // Get embedding model info for a provider and model id
-export const GetEmbeddingModelInfo = (provider: ApiProvider, modelId: string): EmbeddingModelInfo => {
+export const GetEmbeddingModelInfo = (provider: ApiProvider, modelId: string): EmbeddingModelInfo | undefined => {
 	const models = GetEmbeddingProviderModels(provider)
 	return models[modelId]
 }
 
 // Get default model id for a provider
-export const GetDefaultModelId = (provider: ApiProvider): { chat: string, autoComplete: string, embedding: string } => {
+export const GetDefaultModelId = (provider: ApiProvider): { chat: string, insight: string, autoComplete: string, embedding: string } => {
 	switch (provider) {
 		case ApiProvider.Infio:
 			return {
 				"chat": infioDefaultModelId,
+				"insight": infioDefaultInsightModelId,
 				"autoComplete": infioDefaultAutoCompleteModelId,
 				"embedding": infioDefaultEmbeddingModelId,
 			}
 		case ApiProvider.OpenRouter:
 			return {
 				"chat": openRouterDefaultModelId,
+				"insight": openRouterDefaultInsightModelId,
 				"autoComplete": openRouterDefaultAutoCompleteModelId,
 				"embedding": openRouterDefaultEmbeddingModelId,
 			}
 		case ApiProvider.Anthropic:
 			return {
 				"chat": anthropicDefaultModelId,
+				"insight": anthropicDefaultInsightModelId,
 				"autoComplete": anthropicDefaultAutoCompleteModelId,
 				"embedding": anthropicDefaultEmbeddingModelId,
 			}
 		case ApiProvider.OpenAI:
 			return {
 				"chat": openAiNativeDefaultModelId,
+				"insight": openAiNativeDefaultInsightModelId,
 				"autoComplete": openAiNativeDefaultAutoCompleteModelId,
 				"embedding": openAiNativeDefaultEmbeddingModelId,
 			}
 		case ApiProvider.Deepseek:
 			return {
 				"chat": deepSeekDefaultModelId,
+				"insight": deepSeekDefaultInsightModelId,
 				"autoComplete": deepSeekDefaultAutoCompleteModelId,
 				"embedding": deepSeekDefaultEmbeddingModelId,
 			}
 		case ApiProvider.Google:
 			return {
 				"chat": geminiDefaultModelId,
+				"insight": geminiDefaultInsightModelId,
 				"autoComplete": geminiDefaultAutoCompleteModelId,
 				"embedding": geminiDefaultEmbeddingModelId,
 			}
 		case ApiProvider.AlibabaQwen:
 			return {
 				"chat": qwenDefaultModelId,
+				"insight": qwenDefaultInsightModelId,
 				"autoComplete": qwenDefaultAutoCompleteModelId,
 				"embedding": qwenDefaultEmbeddingModelId,
 			}
 		case ApiProvider.SiliconFlow:
 			return {
 				"chat": siliconFlowDefaultModelId,
+				"insight": siliconFlowDefaultInsightModelId,
 				"autoComplete": siliconFlowDefaultAutoCompleteModelId,
 				"embedding": siliconFlowDefaultEmbeddingModelId,
 			}
 		case ApiProvider.Groq:
 			return {
 				"chat": groqDefaultModelId,
+				"insight": groqDefaultInsightModelId,
 				"autoComplete": groqDefaultAutoCompleteModelId,
 				"embedding": groqDefaultEmbeddingModelId,
 			}
 		case ApiProvider.Grok:
 			return {
 				"chat": grokDefaultModelId,
+				"insight": grokDefaultInsightModelId,
 				"autoComplete": grokDefaultAutoCompleteModelId,
 				"embedding": grokDefaultEmbeddingModelId,
+			}
+		case ApiProvider.Ollama:
+			return {
+				"chat": null, // user-configured
+				"insight": null, // user-configured
+				"autoComplete": null, // user-configured
+				"embedding": null, // not supported
+			}
+		case ApiProvider.OpenAICompatible:
+			return {
+				"chat": null, // user-configured
+				"insight": null, // user-configured
+				"autoComplete": null, // user-configured
+				"embedding": null, // user-configured
+			}
+		case ApiProvider.LocalProvider:
+			return {
+				"chat": localProviderDefaultModelId,
+				"insight": localProviderDefaultInsightModelId,
+				"autoComplete": localProviderDefaultAutoCompleteModelId,
+				"embedding": localProviderDefaultEmbeddingModelId,
 			}
 		default:
 			return {
 				"chat": null,
+				"insight": null,
 				"autoComplete": null,
 				"embedding": null,
 			}

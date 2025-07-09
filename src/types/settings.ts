@@ -19,148 +19,188 @@ const InfioProviderSchema = z.object({
 	name: z.literal('Infio'),
 	apiKey: z.string().catch(''),
 	baseUrl: z.string().catch(''),
-	useCustomUrl: z.boolean().catch(false)
+	useCustomUrl: z.boolean().catch(false),
+	models: z.array(z.string()).catch([])
 }).catch({
 	name: 'Infio',
 	apiKey: '',
 	baseUrl: '',
-	useCustomUrl: false
+	useCustomUrl: false,
+	models: []
 })
 
 const OpenRouterProviderSchema = z.object({
 	name: z.literal('OpenRouter'),
 	apiKey: z.string().catch(''),
 	baseUrl: z.string().catch(''),
-	useCustomUrl: z.boolean().catch(false)
+	useCustomUrl: z.boolean().catch(false),
+	models: z.array(z.string()).catch([])
 }).catch({
 	name: 'OpenRouter',
 	apiKey: '',
 	baseUrl: '',
-	useCustomUrl: false
+	useCustomUrl: false,
+	models: []
 })
 
 const SiliconFlowProviderSchema = z.object({
 	name: z.literal('SiliconFlow'),
 	apiKey: z.string().catch(''),
 	baseUrl: z.string().catch(''),
-	useCustomUrl: z.boolean().catch(false)
+	useCustomUrl: z.boolean().catch(false),
+	models: z.array(z.string()).catch([])
 }).catch({
 	name: 'SiliconFlow',
 	apiKey: '',
 	baseUrl: '',
-	useCustomUrl: false
+	useCustomUrl: false,
+	models: []
 })
 
 const AlibabaQwenProviderSchema = z.object({
 	name: z.literal('AlibabaQwen'),
 	apiKey: z.string().catch(''),
 	baseUrl: z.string().catch(''),
-	useCustomUrl: z.boolean().catch(false)
+	useCustomUrl: z.boolean().catch(false),
+	models: z.array(z.string()).catch([])
 }).catch({
 	name: 'AlibabaQwen',
 	apiKey: '',
 	baseUrl: '',
-	useCustomUrl: false
+	useCustomUrl: false,
+	models: []
 })
 
 const AnthropicProviderSchema = z.object({
 	name: z.literal('Anthropic'),
 	apiKey: z.string().catch(''),
 	baseUrl: z.string().optional(),
-	useCustomUrl: z.boolean().catch(false)
+	useCustomUrl: z.boolean().catch(false),
+	models: z.array(z.string()).catch([])
 }).catch({
 	name: 'Anthropic',
 	apiKey: '',
 	baseUrl: '',
-	useCustomUrl: false
+	useCustomUrl: false,
+	models: []
 })
 
 const DeepSeekProviderSchema = z.object({
 	name: z.literal('DeepSeek'),
 	apiKey: z.string().catch(''),
 	baseUrl: z.string().catch(''),
-	useCustomUrl: z.boolean().catch(false)
+	useCustomUrl: z.boolean().catch(false),
+	models: z.array(z.string()).catch([])
 }).catch({
 	name: 'DeepSeek',
 	apiKey: '',
 	baseUrl: '',
-	useCustomUrl: false
+	useCustomUrl: false,
+	models: []
 })
 
 const GoogleProviderSchema = z.object({
 	name: z.literal('Google'),
 	apiKey: z.string().catch(''),
 	baseUrl: z.string().catch(''),
-	useCustomUrl: z.boolean().catch(false)
+	useCustomUrl: z.boolean().catch(false),
+	models: z.array(z.string()).catch([])
 }).catch({
 	name: 'Google',
 	apiKey: '',
 	baseUrl: '',
-	useCustomUrl: false
+	useCustomUrl: false,
+	models: []
 })
 
 const OpenAIProviderSchema = z.object({
 	name: z.literal('OpenAI'),
 	apiKey: z.string().catch(''),
 	baseUrl: z.string().optional(),
-	useCustomUrl: z.boolean().catch(false)
+	useCustomUrl: z.boolean().catch(false),
+	models: z.array(z.string()).catch([])
 }).catch({
 	name: 'OpenAI',
 	apiKey: '',
 	baseUrl: '',
-	useCustomUrl: false
+	useCustomUrl: false,
+	models: []
 })
 
 const OpenAICompatibleProviderSchema = z.object({
 	name: z.literal('OpenAICompatible'),
 	apiKey: z.string().catch(''),
 	baseUrl: z.string().optional(),
-	useCustomUrl: z.boolean().catch(true)
+	useCustomUrl: z.boolean().catch(true),
+	models: z.array(z.string()).catch([])
 }).catch({
 	name: 'OpenAICompatible',
 	apiKey: '',
 	baseUrl: '',
-	useCustomUrl: true
+	useCustomUrl: true,
+	models: []
 })
 
 const OllamaProviderSchema = z.object({
 	name: z.literal('Ollama'),
 	apiKey: z.string().catch('ollama'),
 	baseUrl: z.string().catch(''),
-	useCustomUrl: z.boolean().catch(false)
+	useCustomUrl: z.boolean().catch(false),
+	models: z.array(z.string()).catch([])
 }).catch({
 	name: 'Ollama',
 	apiKey: 'ollama',
 	baseUrl: '',
-	useCustomUrl: true
+	useCustomUrl: true,
+	models: []
 })
 
 const GroqProviderSchema = z.object({
 	name: z.literal('Groq'),
 	apiKey: z.string().catch(''),
 	baseUrl: z.string().catch(''),
-	useCustomUrl: z.boolean().catch(false)
+	useCustomUrl: z.boolean().catch(false),
+	models: z.array(z.string()).catch([])
 }).catch({
 	name: 'Groq',
 	apiKey: '',
 	baseUrl: '',
-	useCustomUrl: false
+	useCustomUrl: false,
+	models: []
 })
 
 const GrokProviderSchema = z.object({
 	name: z.literal('Grok'),
 	apiKey: z.string().catch(''),
 	baseUrl: z.string().catch(''),
-	useCustomUrl: z.boolean().catch(false)
+	useCustomUrl: z.boolean().catch(false),
+	models: z.array(z.string()).catch([])
 }).catch({
 	name: 'Grok',
 	apiKey: '',
 	baseUrl: '',
-	useCustomUrl: false
+	useCustomUrl: false,
+	models: []
+})
+
+const LocalProviderSchema = z.object({
+	name: z.literal('LocalProvider'),
+	apiKey: z.string().catch(''),
+	baseUrl: z.string().catch(''),
+	useCustomUrl: z.boolean().catch(false),
+	models: z.array(z.string()).catch([])
+}).catch({
+	name: 'LocalProvider',
+	apiKey: '',
+	baseUrl: '',
+	useCustomUrl: false,
+	models: []
 })
 
 const ragOptionsSchema = z.object({
-	chunkSize: z.number().catch(1000),
+	filesystem: z.enum(['idb', 'opfs']).catch('opfs'),
+	chunkSize: z.number().catch(500),
+	batchSize: z.number().catch(32),
 	thresholdTokens: z.number().catch(8192),
 	minSimilarity: z.number().catch(0.0),
 	limit: z.number().catch(10),
@@ -242,6 +282,7 @@ export const InfioSettingsSchema = z.object({
 	groqProvider: GroqProviderSchema,
 	grokProvider: GrokProviderSchema,
 	openaicompatibleProvider: OpenAICompatibleProviderSchema,
+	localproviderProvider: LocalProviderSchema,
 
 	// MCP Servers
 	mcpEnabled: z.boolean().catch(false),
@@ -252,12 +293,35 @@ export const InfioSettingsSchema = z.object({
 		modelId: z.string(),
 	})).catch([]),
 
+	// Insight Model start list
+	collectedInsightModels: z.array(z.object({
+		provider: z.nativeEnum(ApiProvider),
+		modelId: z.string(),
+	})).catch([]),
+
+	// Apply Model start list
+	collectedApplyModels: z.array(z.object({
+		provider: z.nativeEnum(ApiProvider),
+		modelId: z.string(),
+	})).catch([]),
+
+	// Embedding Model start list
+	collectedEmbeddingModels: z.array(z.object({
+		provider: z.nativeEnum(ApiProvider),
+		modelId: z.string(),
+	})).catch([]),
+
 	// Active Provider Tab (for UI state)
 	activeProviderTab: z.nativeEnum(ApiProvider).catch(ApiProvider.Infio),
 
 	// Chat Model
 	chatModelProvider: z.nativeEnum(ApiProvider).catch(ApiProvider.Infio),
 	chatModelId: z.string().catch(''),
+
+	// Insight Model
+	insightModelProvider: z.nativeEnum(ApiProvider).catch(ApiProvider.Infio),
+	insightModelId: z.string().catch(''),
+
 	// Apply Model
 	applyModelProvider: z.nativeEnum(ApiProvider).catch(ApiProvider.Infio),
 	applyModelId: z.string().catch(''),
@@ -274,6 +338,9 @@ export const InfioSettingsSchema = z.object({
 	// Multi Search Replace Diff Strategy
 	multiSearchReplaceDiffStrategy: z.boolean().catch(true),
 
+	// Workspace
+	workspace: z.string().catch(''),
+
 	// Mode
 	mode: z.string().catch('ask'),
 	defaultMention: z.enum(['none', 'current-file', 'vault']).catch('none'),
@@ -289,7 +356,9 @@ export const InfioSettingsSchema = z.object({
 
 	// RAG Options
 	ragOptions: ragOptionsSchema.catch({
-		chunkSize: 1000,
+		filesystem: 'opfs',
+		batchSize: 32,
+		chunkSize: 500,
 		thresholdTokens: 8192,
 		minSimilarity: 0.0,
 		limit: 10,

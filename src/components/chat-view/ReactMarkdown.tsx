@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react'
-import Markdown from 'react-markdown'
 
 import { ApplyStatus, ToolArgs } from '../../types/apply'
 import {
@@ -8,19 +7,23 @@ import {
 } from '../../utils/parse-infio-block'
 
 import MarkdownApplyDiffBlock from './Markdown/MarkdownApplyDiffBlock'
+import MarkdownDataviewQueryBlock from './Markdown/MarkdownDataviewQueryBlock'
 import MarkdownEditFileBlock from './Markdown/MarkdownEditFileBlock'
 import MarkdownFetchUrlsContentBlock from './Markdown/MarkdownFetchUrlsContentBlock'
 import MarkdownListFilesBlock from './Markdown/MarkdownListFilesBlock'
+import MarkdownManageFilesBlock from './Markdown/MarkdownManageFilesBlock'
+import MarkdownMatchSearchFilesBlock from './Markdown/MarkdownMatchSearchFilesBlock'
 import MarkdownReadFileBlock from './Markdown/MarkdownReadFileBlock'
 import MarkdownReasoningBlock from './Markdown/MarkdownReasoningBlock'
-import MarkdownMatchSearchFilesBlock from './Markdown/MarkdownMatchSearchFilesBlock'
 import MarkdownRegexSearchFilesBlock from './Markdown/MarkdownRegexSearchFilesBlock'
 import MarkdownSearchAndReplace from './Markdown/MarkdownSearchAndReplace'
 import MarkdownSearchWebBlock from './Markdown/MarkdownSearchWebBlock'
 import MarkdownSemanticSearchFilesBlock from './Markdown/MarkdownSemanticSearchFilesBlock'
 import MarkdownSwitchModeBlock from './Markdown/MarkdownSwitchModeBlock'
 import MarkdownToolResult from './Markdown/MarkdownToolResult'
+import MarkdownTransformationToolBlock from './Markdown/MarkdownTransformationToolBlock'
 import MarkdownWithIcons from './Markdown/MarkdownWithIcon'
+import RawMarkdownBlock from './Markdown/RawMarkdownBlock'
 import UseMcpToolBlock from './Markdown/UseMcpToolBlock'
 
 function ReactMarkdown({
@@ -41,14 +44,15 @@ function ReactMarkdown({
 	return (
 		<>
 			{blocks.map((block, index) =>
-				block.type === 'thinking' ? (
-					<Markdown key={"markdown-" + index} className="infio-markdown">
-						{block.content}
-					</Markdown>
-				) : block.type === 'think' ? (
+				block.type === 'think' ? (
 					<MarkdownReasoningBlock
 						key={"reasoning-" + index}
 						reasoningContent={block.content}
+					/>
+				) : block.type === 'thinking' ? (
+					<RawMarkdownBlock
+						key={"plan-" + index}
+						content={block.content}
 					/>
 				) : block.type === 'write_to_file' ? (
 					<MarkdownEditFileBlock
@@ -200,15 +204,44 @@ function ReactMarkdown({
 						parameters={block.parameters}
 						finish={block.finish}
 					/>
+				) : block.type === 'dataview_query' ? (
+					<MarkdownDataviewQueryBlock
+						key={"dataview-query-" + index}
+						applyStatus={applyStatus}
+						onApply={onApply}
+						query={block.query}
+						outputFormat={block.outputFormat}
+						finish={block.finish}
+					/>
+				) : block.type === 'call_transformations' ? (
+					<MarkdownTransformationToolBlock
+						key={"call-transformations-" + index}
+						applyStatus={applyStatus}
+						onApply={onApply}
+						toolType="call_transformations"
+						path={block.path}
+						transformation={block.transformation}
+						finish={block.finish}
+					/>
+				) : block.type === 'manage_files' ? (
+					<MarkdownManageFilesBlock
+						key={"manage-files-" + index}
+						applyStatus={applyStatus}
+						onApply={onApply}
+						operations={block.operations}
+						finish={block.finish}
+					/>
 				) : block.type === 'tool_result' ? (
 					<MarkdownToolResult
 						key={"tool-result-" + index}
 						content={block.content}
 					/>
 				) : (
-					<Markdown key={"markdown-" + index} className="infio-markdown">
-						{block.content}
-					</Markdown>
+					<RawMarkdownBlock
+						key={"markdown-" + index}
+						content={block.content}
+						className="infio-markdown"
+					/>
 				),
 			)}
 		</>

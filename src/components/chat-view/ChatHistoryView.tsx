@@ -1,7 +1,8 @@
-import { CheckSquare, Clock, Edit3, MessageSquare, Pencil, Search, Square, Trash2, CopyPlus } from 'lucide-react'
+import { CheckSquare, Clock, CopyPlus, Globe, MessageSquare, Pencil, Search, Sparkles, Square, Trash2 } from 'lucide-react'
 import { Notice } from 'obsidian'
 import React, { useMemo, useRef, useState } from 'react'
 
+import { useSettings } from '../../contexts/SettingsContext'
 import { useChatHistory } from '../../hooks/use-chat-history'
 import { t } from '../../lang/helpers'
 import { ChatConversationMeta } from '../../types/chat'
@@ -23,10 +24,20 @@ const ChatHistoryView = ({
 		deleteConversation,
 		updateConversationTitle,
 		chatList,
+		cleanupOutdatedChats,
 	} = useChatHistory()
 
 	// search term
 	const [searchTerm, setSearchTerm] = useState('')
+
+	const { settings } = useSettings()
+
+	const currentWorkspace = React.useMemo(() => {
+		return settings.workspace || 'vault'
+	}, [settings.workspace])
+
+	// workspace filter state
+	const [filterByWorkspace, setFilterByWorkspace] = useState(false)
 
 	// editing conversation id
 	const [editingConversationId, setEditingConversationId] = useState<string | null>(null)
@@ -37,21 +48,56 @@ const ChatHistoryView = ({
 
 	const titleInputRefs = useRef<Map<string, HTMLInputElement>>(new Map())
 
+	const handleCleanup = async () => {
+		const confirmed = confirm(String(t('chat.history.cleanupConfirm')))
+		if (!confirmed) {
+			return
+		}
+
+		try {
+			const count = await cleanupOutdatedChats()
+			if (count > 0) {
+				new Notice(String(t('chat.history.cleanupSuccess', { count })))
+			} else {
+				new Notice(String(t('chat.history.cleanupNone')))
+			}
+		} catch (error) {
+			new Notice(String(t('chat.history.cleanupFailed')))
+			console.error('Failed to cleanup outdated chats', error)
+		}
+	}
+
 	// handle search
 	const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
 		setSearchTerm(e.target.value)
 	}
 
+	// toggle workspace filter
+	const toggleWorkspaceFilter = () => {
+		setFilterByWorkspace(!filterByWorkspace)
+	}
+
 	// filter conversations list
 	const filteredConversations = useMemo(() => {
-		if (!searchTerm.trim()) {
-			return chatList
+		let filtered = chatList
+
+		// Apply search filter
+		if (searchTerm.trim()) {
+			filtered = filtered.filter(
+				conversation =>
+					conversation.title.toLowerCase().includes(searchTerm.toLowerCase())
+			)
 		}
-		return chatList.filter(
-			conversation =>
-				conversation.title.toLowerCase().includes(searchTerm.toLowerCase())
-		)
-	}, [chatList, searchTerm])
+
+		// Apply workspace filter
+		if (filterByWorkspace) {
+			filtered = filtered.filter(
+				conversation => conversation.workspace === currentWorkspace
+			)
+		}
+
+		return filtered
+	}, [chatList, searchTerm, filterByWorkspace, currentWorkspace])
 
 	// toggle selection mode
 	const toggleSelectionMode = () => {
@@ -99,12 +145,12 @@ const ChatHistoryView = ({
 	// batch delete selected conversations
 	const handleBatchDelete = async () => {
 		if (selectedConversations.size === 0) {
-			new Notice('请先选择要删除的对话')
+			new Notice(String(t('chat.history.selectFirst')))
 			return
 		}
 
 		// show confirmation
-		const confirmed = confirm(`确定要删除选中的 ${selectedConversations.size} 个对话吗？此操作不可撤销。`)
+		const confirmed = confirm(String(t('chat.history.batchDeleteConfirm', { count: selectedConversations.size })))
 		if (!confirmed) {
 			return
 		}
@@ -126,10 +172,10 @@ const ChatHistoryView = ({
 
 		// show results
 		if (deletedIds.length > 0) {
-			new Notice(`成功删除 ${deletedIds.length} 个对话`)
+			new Notice(String(t('chat.history.batchDeleteSuccess', { count: deletedIds.length })))
 		}
 		if (errors.length > 0) {
-			new Notice(`${errors.length} 个对话删除失败`)
+			new Notice(String(t('chat.history.batchDeleteFailed', { count: errors.length })))
 		}
 
 		// clear selections
@@ -193,12 +239,20 @@ const ChatHistoryView = ({
 				</div>
 				<div className="infio-chat-history-header-actions">
 					<button
+						onClick={handleCleanup}
+						className="infio-chat-history-cleanup-btn"
+						title={String(t('chat.history.cleanupTitle'))}
+					>
+						<Sparkles size={16} />
+						{t('chat.history.cleanup')}
+					</button>
+					<button
 						onClick={toggleSelectionMode}
 						className={`infio-chat-history-selection-btn ${selectionMode ? 'active' : ''}`}
-						title={selectionMode ? '退出选择模式' : '进入选择模式'}
+						title={selectionMode ? String(t('chat.history.exitSelection')) : String(t('chat.history.enterSelection'))}
 					>
 						<CopyPlus size={16} />
-						{selectionMode ? '取消' : '多选'}
+						{selectionMode ? t('chat.history.cancel') : t('chat.history.multiSelect')}
 					</button>
 				</div>
 			</div>
@@ -206,7 +260,7 @@ const ChatHistoryView = ({
 			{/* description */}
 			<div className="infio-chat-history-tip">
 				{selectionMode 
-					? `选择模式 - 已选择 ${selectedConversations.size} 个对话`
+					? String(t('chat.history.selectionMode', { count: selectedConversations.size }))
 					: String(t('chat.history.description'))
 				}
 			</div>
@@ -222,12 +276,12 @@ const ChatHistoryView = ({
 							{isAllSelected ? (
 								<>
 									<CheckSquare size={16} />
-									取消全选
+									{t('chat.history.unselectAll')}
 								</>
 							) : (
 								<>
 									<Square size={16} />
-									全选
+									{t('chat.history.selectAll')}
 								</>
 							)}
 						</button>
@@ -239,7 +293,7 @@ const ChatHistoryView = ({
 							className="infio-chat-history-batch-delete-btn"
 						>
 							<Trash2 size={16} />
-							批量删除 ({selectedConversations.size})
+							{t('chat.history.batchDelete')} ({selectedConversations.size})
 						</button>
 					</div>
 				</div>
@@ -255,6 +309,18 @@ const ChatHistoryView = ({
 					onChange={handleSearch}
 					className="infio-chat-history-search-input"
 				/>
+			</div>
+
+			{/* workspace filter */}
+			<div className="infio-chat-history-workspace-filter">
+				<button
+					onClick={toggleWorkspaceFilter}
+					className={`infio-chat-history-workspace-filter-btn ${filterByWorkspace ? 'active' : ''}`}
+					title={filterByWorkspace ? String(t('chat.history.showAllChats')) : String(t('chat.history.showWorkspaceChats'))}
+				>
+					<Globe size={14} />
+					{t('chat.history.currentWorkspace')}
+				</button>
 			</div>
 
 			{/* conversations list */}
@@ -325,6 +391,11 @@ const ChatHistoryView = ({
 											{formatDate(conversation.updatedAt)}
 										</div>
 										<div className="infio-chat-history-conversation-title">{conversation.title}</div>
+										{conversation.workspace && (
+											<div className="infio-chat-history-workspace">
+												{t('chat.history.workspaceLabel', { workspace: conversation.workspace })}
+											</div>
+										)}
 									</div>
 									{!selectionMode && (
 										<div className="infio-chat-history-actions">
@@ -398,6 +469,8 @@ const ChatHistoryView = ({
 					flex-shrink: 0;
 				}
 
+				.infio-chat-history-filter-btn,
+				.infio-chat-history-cleanup-btn,
 				.infio-chat-history-selection-btn {
 					display: flex !important;
 					align-items: center;
@@ -415,11 +488,14 @@ const ChatHistoryView = ({
 					box-sizing: border-box;
 				}
 
+				.infio-chat-history-filter-btn:hover,
+				.infio-chat-history-cleanup-btn:hover,
 				.infio-chat-history-selection-btn:hover {
 					background-color: var(--background-modifier-hover, #f5f5f5);
 					border-color: var(--background-modifier-border-hover, #d0d0d0);
 				}
 
+				.infio-chat-history-filter-btn.active,
 				.infio-chat-history-selection-btn.active {
 					background-color: var(--interactive-accent, #007acc);
 					color: var(--text-on-accent, #ffffff);
@@ -509,7 +585,6 @@ const ChatHistoryView = ({
 					border: 1px solid var(--background-modifier-border);
 					border-radius: var(--radius-s);
 					padding: 6px 12px;
-					margin-bottom: var(--size-4-3);
 					transition: all 0.2s ease;
 					height: 36px;
 					max-width: 100%;
@@ -645,6 +720,13 @@ const ChatHistoryView = ({
 					font-size: 12px;
 				}
 
+				.infio-chat-history-workspace {
+					color: var(--text-muted);
+					font-size: 11px;
+					margin-top: 2px;
+					opacity: 0.8;
+				}
+
 				.infio-chat-history-actions {
 					display: flex;
 					gap: 4px;
@@ -737,6 +819,38 @@ const ChatHistoryView = ({
 
 				.infio-chat-history-cancel-btn:hover {
 					background-color: var(--background-modifier-hover);
+				}
+
+				.infio-chat-history-workspace-filter {
+					display: flex;
+					justify-content: flex-start;
+					align-items: center;
+					margin-bottom: 12px;
+				}
+
+				.infio-chat-history-workspace-filter-btn {
+					display: flex;
+					align-items: center;
+					gap: 6px;
+					background-color: transparent;
+					border: 1px solid var(--background-modifier-border);
+					color: var(--text-muted);
+					padding: 6px 12px;
+					border-radius: var(--radius-s);
+					cursor: pointer;
+					font-size: var(--font-ui-small);
+					transition: all 0.2s ease;
+				}
+
+				.infio-chat-history-workspace-filter-btn:hover {
+					background-color: var(--background-modifier-hover);
+					color: var(--text-normal);
+				}
+
+				.infio-chat-history-workspace-filter-btn.active {
+					background-color: var(--interactive-accent);
+					color: var(--text-on-accent);
+					border-color: var(--interactive-accent);
 				}
 				`}
 			</style>

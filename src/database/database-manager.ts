@@ -6,6 +6,7 @@ import { createAndInitDb } from '../pgworker'
 
 import { CommandManager } from './modules/command/command-manager'
 import { ConversationManager } from './modules/conversation/conversation-manager'
+import { InsightManager } from './modules/insight/insight-manager'
 import { VectorManager } from './modules/vector/vector-manager'
 
 export class DBManager {
@@ -14,18 +15,20 @@ export class DBManager {
 	private vectorManager: VectorManager
 	private CommandManager: CommandManager
 	private conversationManager: ConversationManager
+	private insightManager: InsightManager
 
 	constructor(app: App) {
 		this.app = app
 	}
 
-	static async create(app: App): Promise<DBManager> {
+	static async create(app: App, filesystem: string): Promise<DBManager> {
 		const dbManager = new DBManager(app)
-		dbManager.db = await createAndInitDb()
+		dbManager.db = await createAndInitDb(filesystem)
 
 		dbManager.vectorManager = new VectorManager(app, dbManager)
 		dbManager.CommandManager = new CommandManager(app, dbManager)
 		dbManager.conversationManager = new ConversationManager(app, dbManager)
+		dbManager.insightManager = new InsightManager(app, dbManager)
 
 		return dbManager
 	}
@@ -44,6 +47,10 @@ export class DBManager {
 
 	getConversationManager(): ConversationManager {
 		return this.conversationManager
+	}
+
+	getInsightManager(): InsightManager {
+		return this.insightManager
 	}
 
 	async cleanup() {

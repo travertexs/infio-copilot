@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { editorStateToPlainText } from '../components/chat-view/chat-input/utils/editor-state-to-plain-text'
 import { useApp } from '../contexts/AppContext'
+import { useSettings } from '../contexts/SettingsContext'
 import { ChatManager } from '../database/json/chat/ChatManager'
 import { deserializeChatMessage, serializeChatMessage } from '../database/json/utils'
+import { WorkspaceManager } from '../database/json/workspace/WorkspaceManager'
 import { ChatConversationMeta, ChatMessage, ChatUserMessage } from '../types/chat'
 
 type UseChatHistory = {
@@ -17,11 +19,14 @@ type UseChatHistory = {
 	getChatMessagesById: (id: string) => Promise<ChatMessage[] | null>
 	updateConversationTitle: (id: string, title: string) => Promise<void>
 	chatList: ChatConversationMeta[]
+	cleanupOutdatedChats: () => Promise<number>
 }
 
 export function useChatHistory(): UseChatHistory {
 	const app = useApp()
-	const chatManager = useMemo(() => new ChatManager(app), [app])
+	const { settings } = useSettings()
+	const workspaceManager = useMemo(() => new WorkspaceManager(app), [app])
+	const chatManager = useMemo(() => new ChatManager(app, workspaceManager), [app, workspaceManager])
 
 	const [chatList, setChatList] = useState<ChatConversationMeta[]>([])
 
@@ -29,6 +34,9 @@ export function useChatHistory(): UseChatHistory {
 		const conversations = await chatManager.listChats()
 		setChatList(conversations)
 	}, [chatManager])
+
+	// 获取当前工作区
+	const currentWorkspace = settings.workspace || 'vault'
 
 	useEffect(() => {
 		void fetchChatList()
@@ -51,7 +59,7 @@ export function useChatHistory(): UseChatHistory {
 					} else {
 						const firstUserMessage = messages.find((v) => v.role === 'user') as ChatUserMessage
 
-						const newChat = await chatManager.createChat({
+						await chatManager.createChat({
 							id,
 							title: firstUserMessage?.content
 								? editorStateToPlainText(firstUserMessage.content).substring(
@@ -60,6 +68,7 @@ export function useChatHistory(): UseChatHistory {
 								)
 								: 'New chat',
 							messages: serializedMessages,
+							workspace: currentWorkspace,
 						})
 					}
 
@@ -70,7 +79,7 @@ export function useChatHistory(): UseChatHistory {
 					maxWait: 1000,
 				},
 			),
-		[chatManager, fetchChatList],
+		[chatManager, fetchChatList, settings, workspaceManager],
 	)
 
 	const deleteConversation = useCallback(
@@ -111,11 +120,18 @@ export function useChatHistory(): UseChatHistory {
 		[chatManager, fetchChatList],
 	)
 
+	const cleanupOutdatedChats = useCallback(async (): Promise<number> => {
+		const count = await chatManager.cleanupOutdatedChats()
+		await fetchChatList()
+		return count
+	}, [chatManager, fetchChatList])
+
 	return {
 		createOrUpdateConversation,
 		deleteConversation,
 		getChatMessagesById,
 		updateConversationTitle,
 		chatList,
+		cleanupOutdatedChats,
 	}
 }
