@@ -42,28 +42,24 @@ describe('parseSmartCopilotSettings', () => {
 				apiKey: '',
 				baseUrl: '',
 				useCustomUrl: false,
+				models: []
 			},
       openrouterProvider: {
 				name: 'OpenRouter',
 				apiKey: '',
 				baseUrl: '',
 				useCustomUrl: false,
+				models: []
 			},
 			siliconflowProvider: {
 				name: 'SiliconFlow',
 				apiKey: '',
 				baseUrl: '',
 				useCustomUrl: false,
+				models: []
 			},
       alibabaQwenProvider: {
 				name: 'AlibabaQwen',
-				apiKey: '',
-				baseUrl: '',
-				useCustomUrl: false,
-				models: [],
-			},
-			localproviderProvider: {
-				name: 'LocalProvider',
 				apiKey: '',
 				baseUrl: '',
 				useCustomUrl: false,
@@ -88,6 +84,7 @@ describe('parseSmartCopilotSettings', () => {
 				apiKey: '',
 				baseUrl: '',
 				useCustomUrl: false,
+				models: []
 			},
 			googleProvider: {
 				name: 'Google',
@@ -101,6 +98,7 @@ describe('parseSmartCopilotSettings', () => {
 				baseUrl: '',
 				name: 'Ollama',
 				useCustomUrl: true,
+				models: []
 			},
 			groqProvider: {
 				name: 'Groq',
@@ -123,10 +121,23 @@ describe('parseSmartCopilotSettings', () => {
 				useCustomUrl: true,
 				models: [],
 			},
+			localproviderProvider: {
+				name: 'LocalProvider',
+				apiKey: '',
+				baseUrl: '',
+				useCustomUrl: false,
+				models: []
+			},
       // MCP Servers
       mcpEnabled: false,
       // Chat Model start list
       collectedChatModels: [],
+			// Insight Model start list
+			collectedInsightModels: [],
+			// Apply Model start list
+			collectedApplyModels: [],
+			// Embedding Model start list
+			collectedEmbeddingModels: [],
       // Active Provider Tab (for UI state)
 			activeProviderTab: 'Infio',
       // Chat Model
@@ -175,7 +186,9 @@ describe('parseSmartCopilotSettings', () => {
       systemPrompt: '',
       // RAG Options
       ragOptions: {
-				chunkSize: 1000,
+				filesystem: 'opfs',
+				batchSize: 32,
+				chunkSize: 500,
 				thresholdTokens: 8192,
 				minSimilarity: 0.0,
 				limit: 10,
@@ -194,7 +207,7 @@ describe('parseSmartCopilotSettings', () => {
 				top_p: 0.1,
 				frequency_penalty: 0.25,
 				presence_penalty: 0,
-				max_tokens: 800,
+				max_tokens: 4096,
 			},
       // Prompt settings
       systemMessage: DEFAULT_SETTINGS.systemMessage,
@@ -234,7 +247,7 @@ describe('parseSmartCopilotSettings', () => {
         ollamaApplyModel: '',
         openAICompatibleApplyModel: '',
         // API Settings[compatible]
-        apiProvider: '',
+        apiProvider: 'openai',
         azureOAIApiSettings: '',
         openAIApiSettings: '',
         ollamaApiSettings: '',
@@ -248,7 +261,7 @@ describe('parseSmartCopilotSettings', () => {
         filesSearchMethod: '',
         ripgrepPath: '',
         // Disc settings [compatible]
-        chainOfThoughRemovalRegex: '',
+        chainOfThoughRemovalRegex: '(.|\\n)*ANSWER:',
       },
 		})
 	})
@@ -283,7 +296,7 @@ describe('settings migration', () => {
 				top_p: 0.1,
 				frequency_penalty: 0.25,
 				presence_penalty: 0,
-				max_tokens: 4096,
+				max_tokens: 800,
 			},
 			systemMessage: DEFAULT_SETTINGS.systemMessage,
 			fewShotExamples: DEFAULT_SETTINGS.fewShotExamples,
@@ -332,59 +345,81 @@ describe('settings migration', () => {
 				apiKey: '',
 				baseUrl: '',
 				useCustomUrl: false,
+				models: []
 			},
 			anthropicProvider: {
 				name: 'Anthropic',
 				apiKey: 'anthropic-api-key',
 				baseUrl: '',
 				useCustomUrl: false,
+				models: []
 			},
       deepseekProvider: {
 				name: 'DeepSeek',
 				apiKey: '',
 				baseUrl: '',
 				useCustomUrl: false,
+				models: []
 			},
       openaiProvider: {
 				name: 'OpenAI',
 				apiKey: 'openai-api-key',
 				baseUrl: '',
 				useCustomUrl: false,
+				models: []
 			},
 			googleProvider: {
 				name: 'Google',
 				apiKey: '',
 				baseUrl: '',
 				useCustomUrl: false,
+				models: []
 			},
       ollamaProvider: {
 				apiKey: 'ollama',
 				baseUrl: 'http://localhost:11434',
 				name: 'Ollama',
 				useCustomUrl: true,
+				models: []
 			},
 			groqProvider: {
 				name: 'Groq',
 				apiKey: 'groq-api-key',
 				baseUrl: '',
 				useCustomUrl: false,
+				models: []
 			},
 			grokProvider: {
 				name: 'Grok',
 				apiKey: '',
 				baseUrl: '',
 				useCustomUrl: false,
+				models: []
 			},
 			openaicompatibleProvider: {
 				name: 'OpenAICompatible',
 				apiKey: '',
 				baseUrl: '',
 				useCustomUrl: true,
+				models: []
+			},
+			localproviderProvider: {
+				name: 'LocalProvider',
+				apiKey: '',
+				baseUrl: '',
+				useCustomUrl: false,
+				models: []
 			},
       // MCP Servers
       mcpEnabled: false,
       // Chat Model start list
       collectedChatModels: [],
+			// Insight Model start list
+			collectedInsightModels: [],
+			// Apply Model start list
+			collectedApplyModels: [],
+			// Embedding Model start list
+			collectedEmbeddingModels: [],
       // Active Provider Tab (for UI state)
       activeProviderTab: 'Infio',
       // Chat Model
@@ -433,7 +468,9 @@ describe('settings migration', () => {
       systemPrompt: 'system prompt',
       // RAG Options
       ragOptions: {
-				chunkSize: 1000,
+				filesystem: 'opfs',
+				batchSize: 32,
+				chunkSize: 500,
 				thresholdTokens: 8192,
 				minSimilarity: 0.0,
 				limit: 10,
@@ -452,7 +489,7 @@ describe('settings migration', () => {
 				top_p: 0.1,
 				frequency_penalty: 0.25,
 				presence_penalty: 0,
-				max_tokens: 800,
+				max_tokens: 4096,
 			},
       // Prompt settings
       systemMessage: DEFAULT_SETTINGS.systemMessage,
@@ -492,7 +529,7 @@ describe('settings migration', () => {
         ollamaApplyModel: '',
         openAICompatibleApplyModel: '',
         // API Settings[compatible]
-        apiProvider: '',
+        apiProvider: 'openai',
         azureOAIApiSettings: '',
         openAIApiSettings: '',
         ollamaApiSettings: '',
@@ -506,7 +543,7 @@ describe('settings migration', () => {
         filesSearchMethod: '',
         ripgrepPath: '',
         // Disc settings [compatible]
-        chainOfThoughRemovalRegex: '',
+        chainOfThoughRemovalRegex: '(.|\\n)*ANSWER:',
       },
 		})
 	})
